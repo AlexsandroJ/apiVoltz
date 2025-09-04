@@ -9,9 +9,6 @@ const powerEl = document.getElementById('power');
 const canBody = document.getElementById('can-body');
 const themeToggle = document.getElementById('theme-toggle');
 
-// Mapeamento de modos
-const modeNames = { '01': 'eco', '02': 'norm', '03': 'sport' };
-
 // Nome dos IDs CAN conhecidos
 const canIdNames = {
   '0x100': 'Vehicle Speed',
@@ -49,6 +46,7 @@ const API_URL = 'http://localhost:3001/api/history';
 // Mapa - Leaflet
 let map;
 let bikeMarker;
+let lat, lon;
 
 // Inicializa o mapa
 function initMap() {
@@ -68,7 +66,7 @@ function initMap() {
 
 // Função para processar mensagens CAN
 function processCanMessage(msg) {
-  
+
   const id = msg.canId?.toUpperCase() || 'N/D';
   const data = msg.data ? msg.data.split(' ').map(b => parseInt(b, 16)) : [];
   const timestamp = msg.timestamp
@@ -81,7 +79,10 @@ function processCanMessage(msg) {
   driveModeEl.textContent = msg.driveMode;
   powerEl.textContent = msg.motor.power;
 
-  return  { msg.canMessages[0]};
+  return {
+    ...msg.canMessages[0],        // copia todas as propriedades da primeira CAN message
+    timestamp: msg.deviceId       // adiciona o timestamp do objeto pai
+  };
 }
 
 // Atualiza posição no mapa
@@ -99,7 +100,7 @@ function updateMapPosition(lat, lon) {
 
 // Atualiza tabela CAN
 function updateCanTable(messages) {
-  
+
   canBody.innerHTML = '';
   const recent = messages.slice(-50);
   if (recent.length === 0) {
@@ -108,16 +109,15 @@ function updateCanTable(messages) {
     canBody.appendChild(row);
     return;
   }
-  console.log(recent)
+  
   recent.forEach(msgData => {
     const tr = document.createElement('tr');
     tr.classList.add('highlight');
     tr.innerHTML = `
-      <td><strong>${msgData.canId}</strong></td>
+      <td><strong>${msgData.timestamp}</strong></td>
+      <td>${msgData.canId}</td>
       <td>${msgData.data}</td>
       <td>${msgData.dlc}</td>
-      <td>${msgData.timestamp}</td>
-      <td>${msgData.interpretation}</td>
     `;
     canBody.appendChild(tr);
     setTimeout(() => tr.classList.remove('highlight'), 500);
@@ -131,7 +131,25 @@ async function fetchCanData() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const messages = await response.json();
     const processedMessages = messages.map(processCanMessage).filter(Boolean);
+
+    if (!messages || messages.length === 0) {
+      console.warn('Nenhum dado recebido da API');
+      statusIndicator.classList.remove('online');
+    canBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty" ">
+          Nenhum dado recebido da API.
+        </td>
+      </tr>
+    `;
+      return; // ou atualize UI com "sem dados"
+    }
+    const { gpsLocation, speed, battery, driveMode, motor } = messages[0];
+    const { lat, lon } = gpsLocation;
+
     updateCanTable(processedMessages);
+    updateMapPosition(lat, lon);
+
     statusIndicator.classList.add('online');
   } catch (error) {
     console.error('Erro ao buscar dados:', error);
@@ -174,4 +192,4 @@ document.addEventListener('DOMContentLoaded', () => {
 themeToggle?.addEventListener('click', toggleTheme);
 
 // Atualização automática
-setInterval(fetchCanData, 2000);
+setInterval(fetchCanData, 5000);
