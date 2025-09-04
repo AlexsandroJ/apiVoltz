@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Voltz RV1 - Rede CAN</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body class="dark-theme">
+  <div class="container">
+    <header>
+      <h1>⚡ Voltz RV1 - Dashboard CAN</h1>
+      <p class="subtitle">
+        Monitoramento em Tempo Real
+        <span class="status-indicator" id="status-indicator"></span>
+      </p>
+      <button id="theme-toggle" title="Alternar tema">☀️</button>
+    </header>
+
+    <!-- Área de Visualização de Dados -->
+    <div class="data-panel">
+      <div class="data-card">
+        <h2>Velocidade</h2>
+        <div class="value" id="speed">--</div>
+        <div class="unit">km/h</div>
+      </div>
+
+      <div class="data-card">
+        <h2>🔋 Bateria</h2>
+        <div class="value" id="battery">--</div>
+        <div class="unit">%</div>
+      </div>
+
+      <div class="data-card">
+        <h2>Autonomia</h2>
+        <div class="value" id="range">--</div>
+        <div class="unit">km</div>
+      </div>
+
+      <div class="data-card">
+        <h2>🌡️​ Temp. Bateria</h2>
+        <div class="value" id="temp-batt">--</div>
+        <div class="unit">°C</div>
+      </div>
+
+      <div class="data-card">
+        <h2>Modo de Condução</h2>
+        <div class="unit" id="drive-mode">--</div>
+      </div>
+
+      <div class="data-card">
+        <h2>Potência</h2>
+        <div class="value" id="power">--</div>
+        <div class="unit">kW</div>
+      </div>
+    </div>
+
+     <!-- Área do Mapa -->
+    <div class="map-section">
+      <h2>📍 Localização da Moto</h2>
+      <div id="map"></div>
+    </div>
+
+    <!-- Área de Log CAN -->
+    <div class="can-section">
+      <h2>📡 Rede CAN - Mensagens Recebidas</h2>
+      <div class="can-table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Dados (Hex)</th>
+              <th>DLC</th>
+              <th>Timestamp</th>
+              <th>Interpretação</th>
+            </tr>
+          </thead>
+          <tbody id="can-body">
+            <tr><td colspan="5" class="empty">Carregando mensagens...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div> 
+
+    <footer>
+      &copy; 2025 Sistema de Monitoramento Voltz RV1 | Dados da rede CAN via API
+    </footer>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Script principal -->
+  <script src="script.js"></script>
+</body>
+</html>
