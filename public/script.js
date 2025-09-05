@@ -39,7 +39,6 @@ const liveData = {
   power: '--',
   lastCoords: null
 };
-process.env
 // URL da API
 const API_URL = process.env.API_URL;
 
