@@ -39,8 +39,6 @@ const liveData = {
   power: '--',
   lastCoords: null
 };
-// URL da API
-const API_URL =  import.meta.env.API_URL;
 
 // Mapa - Leaflet
 let map;
@@ -126,7 +124,11 @@ function updateCanTable(messages) {
 // Busca dados da API
 async function fetchCanData() {
   try {
-    const response = await fetch(API_URL);
+
+    const dashboardApiUrl = '/api/dashboard-data';
+    // Faz a requisição e espera pela resposta
+    const response = await fetch(dashboardApiUrl);
+    
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const messages = await response.json();
     const processedMessages = messages.map(processCanMessage).filter(Boolean);

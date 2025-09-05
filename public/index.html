@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Voltz RV1 - Rede CAN</title>
   <link rel="stylesheet" href="style.css" />
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
+
 <body class="dark-theme">
   <div class="container">
     <header>
@@ -57,7 +59,7 @@
       </div>
     </div>
 
-     <!-- Área do Mapa -->
+    <!-- Área do Mapa -->
     <div class="map-section">
       <h2>📍 Localização da Moto</h2>
       <div id="map"></div>
@@ -77,11 +79,13 @@
             </tr>
           </thead>
           <tbody id="can-body">
-            <tr><td colspan="5" class="empty">Carregando mensagens...</td></tr>
+            <tr>
+              <td colspan="5" class="empty">Carregando mensagens...</td>
+            </tr>
           </tbody>
         </table>
       </div>
-    </div> 
+    </div>
 
     <footer>
       &copy; 2025 Sistema de Monitoramento Voltz RV1 | Dados da rede CAN via API
@@ -93,4 +97,5 @@
   <!-- Script principal -->
   <script src="script.js"></script>
 </body>
+
 </html>
