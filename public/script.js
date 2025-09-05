@@ -39,9 +39,9 @@ const liveData = {
   power: '--',
   lastCoords: null
 };
-
+process.env
 // URL da API
-const API_URL = 'http://localhost:3001/api/history';
+const API_URL = process.env.API_URL;
 
 // Mapa - Leaflet
 let map;
