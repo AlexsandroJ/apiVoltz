@@ -1,5 +1,5 @@
 // Elementos do DOM
-const dotenv = require('dotenv');
+require('dotenv').config();
 const statusIndicator = document.getElementById('status-indicator');
 const speedEl = document.getElementById('speed');
 const batteryEl = document.getElementById('battery');
