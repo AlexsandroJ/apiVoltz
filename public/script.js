@@ -1,5 +1,4 @@
 // Elementos do DOM
-require('dotenv').config();
 const statusIndicator = document.getElementById('status-indicator');
 const speedEl = document.getElementById('speed');
 const batteryEl = document.getElementById('battery');
@@ -41,7 +40,7 @@ const liveData = {
   lastCoords: null
 };
 // URL da API
-const API_URL = process.env.API_URL;
+const API_URL =  import.meta.env.API_URL;
 
 // Mapa - Leaflet
 let map;
