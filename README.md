@@ -41,11 +41,11 @@ O **Voltz Telemetry** é um sistema full-stack que combina uma **API RESTful** c
 
 ## 🛠️ Tecnologias Utilizadas
 
-| Camada      | Tecnologia                         |
+| Camada      | Tecnologia                          |
 |-------------|-------------------------------------|
 | Frontend    | HTML, CSS, JavaScript               |
 | Backend     | Node.js + Mongo + Express           |
-| Comunicação | REST API + WebSocket (opcional)     |
+| Comunicação | REST API + WebSocket                |
 | Mapas       | OpenStreetMap                       |
 | Deploy      | Kubernets (K3s)                     |
 
