@@ -1,6 +1,10 @@
 #include <Arduino.h>
 #include <driver/twai.h>
 
+// Configuração dos pinos CAN
+#define CAN_TX_PIN GPIO_NUM_5
+#define CAN_RX_PIN GPIO_NUM_4
+
 //======= CONFIGURAÇÕES CAN do TCC =======
 #define N_BATTERIES 1              // Number of batteries in the system
 #define BASE_BATTERY_ID 0x351      // Base ID for battery data
@@ -19,7 +23,6 @@ struct batteryInfo {
 };
 // Instantiate an array with all baterries configured
 struct batteryInfo batteries[N_BATTERIES];
-
 // Creates a struct to store powertrain's data
 struct powertrainInfo {
   int motorSpeedRPM = 0;
@@ -29,7 +32,6 @@ struct powertrainInfo {
 };
 // Instantiate the powertrain structure
 struct powertrainInfo CurrentPowertrainData;
-
 // Creates a struct to store MCU's error log
 struct ControllerErrorInfo {
   int hardwareFault1 = 0;          // hardware fault
@@ -50,7 +52,6 @@ struct ControllerErrorInfo {
 };
 //  Instantiate the err structure
 struct ControllerErrorInfo mcuError;
-
 // Creates a struct to store BMS error data
 struct BMSErrorInfo {
   int W_cell_chg = 0;               // cell over charge warning
@@ -93,15 +94,9 @@ struct BMSErrorInfo {
   int E_chg_dchg_current_conflict = 0; // charge and discharge current conflict
   int E_cable_abnormal = 0;            // cable abnormal
 };
-
 //  Instantiate the err structure
 struct BMSErrorInfo bmsError[N_BATTERIES];
 // ========== END CONFIGURAÇÕES CAN ==========
-
-
-// Configuração dos pinos CAN
-#define CAN_TX_PIN GPIO_NUM_5
-#define CAN_RX_PIN GPIO_NUM_4
 
 // TaskHandle
 TaskHandle_t xHandleCANReader = NULL;
@@ -123,7 +118,39 @@ void taskCANReader(void *pvParameters) {
   }
 }
 
-void reverse(twai_message_t *message) {
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  // Configuração do controlador CAN (TWAI)
+  // clang-format off
+  twai_general_config_t g_config    = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
+  twai_timing_config_t t_config     = TWAI_TIMING_CONFIG_250KBITS(); // 250 kbps
+  twai_filter_config_t f_config     = TWAI_FILTER_CONFIG_ACCEPT_ALL(); // Aceita todos os IDs
+  // clang-format on
+  // Instala e inicia o driver CAN
+  if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
+    Serial.println("Falha ao instalar driver CAN!");
+    return;
+  }
+
+  if (twai_start() != ESP_OK) {
+    Serial.println("Falha ao iniciar CAN!");
+    return;
+  }
+
+  Serial.println("CAN Iniciado com sucesso (250kbps)");
+
+  // Cria a tarefa FreeRTOS
+  xTaskCreate(taskCANReader, "CAN_Reader", 4096, NULL, 2, &xHandleCANReader);
+}
+
+void loop() {
+  vTaskDelay(1000); // Mantém o sistema rodando
+}
+
+// Não usada
+void DecodeCANMessage(twai_message_t *message) {
 
   // Loop control variables
   bool already_checked[6] = {false, false, false,
@@ -244,35 +271,4 @@ void reverse(twai_message_t *message) {
     // Flag this packet as already checked
     already_checked[index + idOffset] = true;
   }
-}
-
-void setup() {
-  Serial.begin(115200);
-  delay(500);
-
-  // Configuração do controlador CAN (TWAI)
-  // clang-format off
-  twai_general_config_t g_config    = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
-  twai_timing_config_t t_config     = TWAI_TIMING_CONFIG_500KBITS(); // 500 kbps
-  twai_filter_config_t f_config     = TWAI_FILTER_CONFIG_ACCEPT_ALL(); // Aceita todos os IDs
-  // clang-format on
-  // Instala e inicia o driver CAN
-  if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
-    Serial.println("Falha ao instalar driver CAN!");
-    return;
-  }
-
-  if (twai_start() != ESP_OK) {
-    Serial.println("Falha ao iniciar CAN!");
-    return;
-  }
-
-  Serial.println("CAN Iniciado com sucesso (500kbps)");
-
-  // Cria a tarefa FreeRTOS
-  xTaskCreate(taskCANReader, "CAN_Reader", 4096, NULL, 2, &xHandleCANReader);
-}
-
-void loop() {
-  vTaskDelay(1000); // Mantém o sistema rodando
 }
