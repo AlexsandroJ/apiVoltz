@@ -87,64 +87,171 @@ void logCanFrame(const twai_message_t& rx) {
 void handleRoot() {
   String html = R"rawliteral(
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ESP32 CAN Datalogger (Flash)</title>
-<style>
-  body { font-family: Arial, sans-serif; background-color: #f4f4f4; }
-  .container { max-width: 600px; margin: 50px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.2); text-align: center; }
-  h1 { color: #333; }
-  button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; font-size: 16px; }
-  #download-btn { background-color: #008CBA; }
-  #delete-btn { background-color: #f44336; }
-  button:hover { opacity: 0.8; }
-  .status { margin-top: 15px; color: #555; font-size: 1.1em; border-top: 1px solid #eee; padding-top: 15px;}
-  .log-count { margin-top: 5px; color: #008CBA; font-size: 1.1em; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 CAN Datalogger (Flash)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      padding: 32px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 16px;
+      color: #2c3e50;
+    }
+
+    p {
+      color: #555;
+      margin-bottom: 24px;
+      font-size: 1.05rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 24px;
+      margin: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      color: white;
+      min-width: 200px;
+    }
+
+    #download-btn {
+      background: #2196F3; /* Azul moderno */
+    }
+
+    #delete-btn {
+      background: #f44336; /* Vermelho suave */
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      opacity: 1;
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .log-count, .status {
+      margin-top: 20px;
+      padding: 12px;
+      background-color: #f9fbfd;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      color: #2c3e50;
+    }
+
+    .log-count b, .status b {
+      color: #1976D2;
+    }
+
+    .warning {
+      margin-top: 24px;
+      padding: 12px;
+      background-color: #fff8e1;
+      border-left: 4px solid #ffc107;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: #5d4037;
+      text-align: left;
+    }
+
+    .warning::before {
+      content: "⚠️ ";
+      font-size: 1.2em;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 24px 16px;
+      }
+
+      .btn {
+        width: 100%;
+        margin: 8px 0;
+      }
+    }
+  </style>
 </head>
 <body>
 
 <div class="container">
   <h1>ESP32 Datalogger CAN</h1>
-  <p>Status do Log: Salvo na Memória Flash Interna.</p>
-  
-  <button id="download-btn" onclick="window.location.href='/download'">
-    BAIXAR ARQUIVO DE LOG (can_log.csv)
-  </button>
-  
-  <button id="delete-btn" onclick="confirmDelete()">
-    APAGAR LOG E LIBERAR ESPAÇO
-  </button>
-  
-  <div class="log-count" id="log-count-info"></div>
-  
-  <div class="status" id="free-space"></div>
-  
-  <p><small>Atenção: A gravação constante na memória flash tem vida útil limitada.</small></p>
+  <p>📝 Status do Log: Salvo na Memória Flash Interna.</p>
 
+  <a href="/download" class="btn" id="download-btn">
+    📥 BAIXAR ARQUIVO DE LOG (can_log.csv)
+  </a>
+
+  <button class="btn" id="delete-btn" onclick="confirmDelete()">
+    🗑️ APAGAR LOG E LIBERAR ESPAÇO
+  </button>
+
+  <div class="log-count" id="log-count-info">
+    Carregando informações...
+  </div>
+
+  <div class="status" id="free-space">
+    Verificando espaço livre...
+  </div>
+
+  <div class="warning">
+    <small>A gravação constante na memória flash tem vida útil limitada. Use com moderação.</small>
+  </div>
 </div>
 
 <script>
 function getInfo() {
-    // 1. Requisitar Espaço Livre (mantido)
+    // Espaço livre
     var xhttpFree = new XMLHttpRequest();
     xhttpFree.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            document.getElementById("free-space").innerHTML = "Espaço Livre Restante: <b>" + this.responseText + "</b>";
+            document.getElementById("free-space").innerHTML = "💾 Espaço Livre Restante: <b>" + this.responseText + "</b>";
         }
     };
     xhttpFree.open("GET", "/freespace", true);
     xhttpFree.send();
 
-    // 2. Requisitar Contagem de Logs e Tamanho (NOVO)
+    // Contagem de logs
     var xhttpInfo = new XMLHttpRequest();
     xhttpInfo.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            // O responseText será "LINHAS,TAMANHO_FORMATADO"
             var parts = this.responseText.split(',');
-            if (parts.length == 2) {
-                var infoText = "Frames Registrados: <b>" + parts[0] + "</b> | Tamanho Total do Log: <b>" + parts[1] + "</b>";
+            if (parts.length === 2) {
+                var infoText = "📊 Frames Registrados: <b>" + parts[0] + "</b> | 📏 Tamanho Total: <b>" + parts[1] + "</b>";
                 document.getElementById("log-count-info").innerHTML = infoText;
             }
         }
@@ -154,14 +261,13 @@ function getInfo() {
 }
 
 function confirmDelete() {
-    if (confirm("Tem certeza que deseja apagar PERMANENTEMENTE o arquivo de log?")) {
-        window.location.href='/delete';
+    if (confirm("⚠️ Tem certeza que deseja apagar PERMANENTEMENTE o arquivo de log?")) {
+        window.location.href = '/delete';
     }
 }
 
-// Atualiza a cada 5 segundos
-window.onload = getInfo; 
-setInterval(getInfo, 5000); 
+window.onload = getInfo;
+setInterval(getInfo, 5000);
 </script>
 
 </body>
