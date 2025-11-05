@@ -23,42 +23,59 @@
 
     <!-- Área de Visualização de Dados -->
     <div class="data-panel">
+
       <div class="data-card">
-        <h2>Velocidade</h2>
-        <div class="value" id="speed">--</div>
-        <div class="unit">km/h</div>
+        <h2>RPM</h2>
+        <div class="value" id="rpm">--</div>
+        <div class="unit">rpm</div>
       </div>
 
       <div class="data-card">
-        <h2>🔋 Bateria</h2>
-        <div class="value" id="battery">--</div>
-        <div class="unit">%</div>
+        <h2>Torque</h2>
+        <div class="value" id="torque">--</div>
+        <div class="unit">Nm</div>
       </div>
 
       <div class="data-card">
-        <h2>Autonomia</h2>
-        <div class="value" id="range">--</div>
-        <div class="unit">km</div>
+        <h2>🌡️ Temp. Motor</h2>
+        <div class="value" id="temp-motor">--</div>
+        <div class="unit">°C</div>
       </div>
 
       <div class="data-card">
-        <h2>🌡️​ Temp. Bateria</h2>
+        <h2>🌡️​ Temp. Controlador</h2>
         <div class="value" id="temp-batt">--</div>
         <div class="unit">°C</div>
       </div>
 
       <div class="data-card">
-        <h2>Modo de Condução</h2>
-        <div class="unit" id="drive-mode">--</div>
+        <h2> BMS Voltage</h2>
+        <div class="unit" id="bms-voltage">--</div>
       </div>
 
       <div class="data-card">
-        <h2>Potência</h2>
-        <div class="value" id="power">--</div>
-        <div class="unit">kW</div>
+        <h2>BMS Current</h2>
+        <div class="value" id="bms-current">--</div>
+        <div class="unit">A</div>
       </div>
+      <div class="data-card">
+        <h2>BMS SoC</h2>
+        <div class="unit" id="bms-soc">--</div>
+      </div>
+
+      <div class="data-card">
+        <h2>BMS SoH</h2>
+        <div class="value" id="bms-soh">--</div>
+        <div class="unit">%</div>
+      </div>
+
     </div>
 
+    <div class="data-card">
+      <h2>🌡️ BMS</h2>
+      <div class="value" id="bms-temp">--</div>
+      <div class="unit">°C</div>
+    </div>
     <!-- Área do Mapa -->
     <div class="map-section">
       <h2>📍 Localização da Moto</h2>
@@ -75,7 +92,7 @@
               <th>Timestamp</th>
               <th>ID</th>
               <th>Dados (Hex)</th>
-              
+
             </tr>
           </thead>
           <tbody id="can-body">

@@ -1,40 +1,30 @@
 // Elementos do DOM
-const statusIndicator = document.getElementById('status-indicator');
-const speedEl = document.getElementById('speed');
-const batteryEl = document.getElementById('battery');
-const rangeEl = document.getElementById('range');
-const tempBattEl = document.getElementById('temp-batt');
-const driveModeEl = document.getElementById('drive-mode');
-const powerEl = document.getElementById('power');
-const canBody = document.getElementById('can-body');
+const rpm = document.getElementById('rpm');
+const torque = document.getElementById('torque');
+const tempMotor = document.getElementById('temp-motor');
+const tempBatt = document.getElementById('temp-batt');
+const bmsVoltage = document.getElementById('bms-voltage');
+const bmsCurrent = document.getElementById('bms-current');
+const bmsSoc = document.getElementById('bms-soc');
+const bmsSoH = document.getElementById('bms-soh');
+const bmsTemp = document.getElementById('bms-temp');
 const themeToggle = document.getElementById('theme-toggle');
 // Nome dos IDs CAN conhecidos
 const canIdNames = {
-  '0x100': 'Vehicle Speed',
-  '0x201': 'Motor Power',
-  '0x202': 'Motor RPM',
-  '0x203': 'Regen Level',
-  '0x5A0': 'BMS Status',
-  '0x5A2': 'Battery Voltage',
-  '0x5A3': 'Battery Current',
-  '0x5A4': 'Battery Temperature',
-  '0x5A5': 'Battery SoC',
-  '0x5A6': 'Charging Status',
-  '0x300': 'Drive Mode',
-  '0x301': 'Throttle Input',
-  '0x400': 'Odometer',
-  '0x600': 'Error Codes',
-  '0x700': 'GPS Location',
-  '0x7E8': 'OBD-II Response'
+  '0x120': 'BMS Status',
+  '0x300': 'Motor Status',
 };
 // Dados atuais
 const liveData = {
-  speed: '--',
-  battery: '--',
-  range: '--',
+  rpm: '--',
+  torque: '--',
+  tempMotor: '--',
   tempBatt: '--',
-  driveMode: '--',
-  power: '--',
+  bmsCurrent: '--',
+  bmsVoltage: '--',
+  bmsSoc: '--',
+  bmsSoH: '--',
+  bmsTemp: '--',
   lastCoords: null
 };
 // Mapa - Leaflet
