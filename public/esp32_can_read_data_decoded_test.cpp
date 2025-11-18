@@ -1,144 +1,230 @@
-// Inclusão de bibliotecas essenciais:
-// - Arduino.h: Biblioteca base do Arduino
-// - WiFi.h e WebServer.h: Para funcionalidades WiFi e servidor web
-// - ESP32CAN.h: Para comunicação CAN no ESP32
-#include <Arduino.h>
+#include <ESP32-TWAI-CAN.hpp>
 #include <WiFi.h>
 #include <WebServer.h>
-#include <ESP32CAN.h>  // Biblioteca ESP32CAN (https://github.com/miwagner/ESP32CAN)
+#include <ArduinoJson.h>
 
-// Credenciais de rede WiFi
-const char* ssid = "CINGUESTS";      // Nome da rede WiFi
-const char* password = "acessocin";  // Senha da rede WiFi
+// ------------------------------------------------------------------
+// --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---
+// ------------------------------------------------------------------
+#define CAN_TX_PIN 5
+#define CAN_RX_PIN 4
+const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
+twai_message_t rxFrame;
 
-// IDs base dos frames CAN para identificação de BMS e Controlador de Motor
+// IDs base
 #define BASE_BATTERY_ID     0x120  // ID base para dados da bateria (BMS)
 #define BASE_CONTROLLER_ID  0x300  // ID base para dados do motor/controlador
 
-// Estrutura para armazenar os dados recebidos do BMS (Battery Management System)
+// Variáveis para armazenar os dados decodificados
 struct BatteryData {
-    float voltage = 0.0;      // Tensão da bateria em Volts
-    float current = 0.0;      // Corrente em Amperes (positiva = carga, negativa = descarga)
-    uint8_t SoC = 0;          // State of Charge - Nível de carga em %
-    uint8_t SoH = 0;          // State of Health - Nível de saúde em %
-    uint8_t temperature = 0;  // Temperatura da bateria em °C
-};
+  int current = 0;
+  int voltage = 0;
+  int soc = 0;
+  int soh = 0;
+  int temperature = 0;
+  bool valid = false;
+} battery;
 
-// Estrutura para armazenar os dados recebidos do controlador do motor
-struct MotorData {
-    uint16_t motorSpeedRPM = 0;       // RPM do motor
-    float motorTorque = 0.0;          // Torque do motor em Nm
-    int8_t motorTemperature = 0;      // Temperatura do motor em °C
-    int8_t controllerTemperature = 0; // Temperatura do controlador em °C
-};
+struct MotorControllerData {
+  int motorSpeedRpm = 0;
+  float motorTorque = 0.0;
+  int motorTemperature = 0;
+  int controllerTemperature = 0;
+  bool valid = false;
+} motorController;
 
-// Variáveis globais para armazenar os dados e controle de atualização
-BatteryData battery;
-MotorData motor;
-bool batteryUpdated = false; // Flag para saber se os dados da bateria foram atualizados
-bool motorUpdated = false;   // Flag para saber se os dados do motor foram atualizados
-
-// Servidor web na porta 80 (padrão HTTP)
+// Configuração Wi-Fi e WebServer
+const char* ssid = "CINGUESTS";
+const char* password = "acessocin";
 WebServer server(80);
 
-// Configurações da comunicação CAN
-CAN_device_t CAN_cfg; // Configurações do barramento CAN
-CAN_message_t rx_frame; // Estrutura para armazenar a mensagem CAN recebida
-
-void setup() {
-    Serial.begin(115200); // Inicializa a comunicação serial para debug
-    delay(1000);
-
-    // Conecta ao WiFi
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print("."); // Imprime ponto enquanto tenta conectar
-    }
-    Serial.println("\nWiFi conectado. IP: " + WiFi.localIP().toString()); // Imprime o IP atribuído
-
-    // Configuração da interface CAN
-    CAN_cfg.speed = CAN_SPEED_250KBPS; // Define a velocidade do barramento CAN
-    CAN_cfg.tx_pin_id = GPIO_NUM_5;    // Pino TX CAN
-    CAN_cfg.rx_pin_id = GPIO_NUM_4;    // Pino RX CAN
-    CAN_init(); // Inicializa a interface CAN
-
-    // Configuração do servidor web
-    server.on("/", HTTP_GET, []() { // Define a rota raiz "/"
-        // Cria a página HTML a ser enviada
-        String html = "<!DOCTYPE html><html><head>";
-        html += "<meta charset='UTF-8'>";
-        html += "<meta http-equiv='refresh' content='1'>"; // Atualiza a página a cada 1 segundo
-        html += "<title>Dados CAN - BMS & Motor</title>";
-        html += "<style>body{font-family:Arial; padding:20px;}</style>"; // Estilo CSS simples
-        html += "</head><body>";
-        html += "<h2>Dados CAN em Tempo Real</h2>";
-
-        // Exibe os dados da bateria, se tiver sido atualizado recentemente
-        if (batteryUpdated) {
-            html += "<h3>Bateria (ID 0x120)</h3>";
-            html += "Tensão: " + String(battery.voltage, 1) + " V<br>";
-            html += "Corrente: " + String(battery.current, 1) + " A<br>";
-            html += "SoC: " + String(battery.SoC) + " %<br>";
-            html += "SoH: " + String(battery.SoH) + " %<br>";
-            html += "Temp: " + String(battery.temperature) + " °C<br><br>";
-        } else {
-            html += "<h3>Bateria: Sem dados recentes</h3><br>";
-        }
-
-        // Exibe os dados do motor, se tiver sido atualizado recentemente
-        if (motorUpdated) {
-            html += "<h3>Motor (ID 0x300)</h3>";
-            html += "RPM: " + String(motor.motorSpeedRPM) + " rpm<br>";
-            html += "Torque: " + String(motor.motorTorque, 1) + " Nm<br>";
-            html += "Temp Motor: " + String(motor.motorTemperature) + " °C<br>";
-            html += "Temp Controlador: " + String(motor.controllerTemperature) + " °C<br>";
-        } else {
-            html += "<h3>Motor: Sem dados recentes</h3><br>";
-        }
-
-        html += "</body></html>";
-        server.send(200, "text/html", html); // Envia a resposta HTTP com a página HTML
-    });
-
-    server.begin(); // Inicia o servidor web
-    Serial.println("Servidor web iniciado.");
+// ------------------------------------------------------------------
+// --- FUNÇÕES DE DECODIFICAÇÃO ---
+// ------------------------------------------------------------------
+void decodeBatteryData(byte* data) {
+  // current = np.int_((cadeia_bytes[2] * 256) + cadeia_bytes[3] * 0.1)
+  battery.current = (int)((data[2] * 256 + data[3]) * 0.1);
+  
+  // voltage = np.int_((cadeia_bytes[0] * 256) + cadeia_bytes[1] * 0.1)
+  battery.voltage = (int)((data[0] * 256 + data[1]) * 0.1);
+  
+  // SoC = np.int_(cadeia_bytes[6])
+  battery.soc = (int)data[6];
+  
+  // SoH = np.int_(cadeia_bytes[7])
+  battery.soh = (int)data[7];
+  
+  // temperature = np.int_(cadeia_bytes[4])
+  battery.temperature = (int)data[4];
+  
+  battery.valid = true;
 }
 
-void loop() {
-    // Lê uma mensagem CAN recebida
-    if (CAN_read_message(&rx_frame) == 0) { // 0 indica sucesso na leitura
-        uint32_t packetID = rx_frame.MsgID; // Obtém o ID da mensagem CAN
-        uint8_t* packetData = rx_frame.buf; // Obtém o buffer de dados da mensagem
+void decodeMotorControllerData(byte* data) {
+  // motor_speed_rpm = np.int_((cadeia_bytes[0] * 256) + cadeia_bytes[1])
+  motorController.motorSpeedRpm = (int)(data[0] * 256 + data[1]);
+  
+  // motor_torque = np.int_((cadeia_bytes[2] * 256) + cadeia_bytes[3] * 0.1)
+  motorController.motorTorque = (float)((data[2] * 256 + data[3]) * 0.1);
+  
+  // motor_temperature = np.int_(cadeia_bytes[7] - 40)
+  motorController.motorTemperature = (int)(data[7] - 40);
+  
+  // controller_temperature = np.int_(cadeia_bytes[6] - 40)
+  motorController.controllerTemperature = (int)(data[6] - 40);
+  
+  motorController.valid = true;
+}
 
-        // Verifica se não é uma mensagem de solicitação remota (RTR)
-        if (rx_frame.FIR.B.RTR == 0) {
-            // Verifica se é um frame de dados da bateria (ID 0x120)
-            if (packetID == BASE_BATTERY_ID) {
-                // Decodifica os dados do frame CAN para a estrutura BatteryData
-                // Exemplo: tensão em bytes 0 e 1, corrente em 2 e 3, etc.
-                // Os dados são interpretados como big-endian e convertidos para valores reais
-                battery.voltage = (packetData[0] * 256 + packetData[1]) * 0.1; // Valor em 0.1V
-                battery.current = (packetData[2] * 256 + packetData[3]) * 0.1; // Valor em 0.1A
-                battery.temperature = packetData[4]; // Temperatura em °C
-                battery.SoC = packetData[6]; // Porcentagem
-                battery.SoH = packetData[7]; // Porcentagem
-                batteryUpdated = true; // Marca que os dados da bateria foram atualizados
-                Serial.println("Recebido: BMS (0x120)"); // Mensagem de debug
-            }
-            // Verifica se é um frame de dados do motor (ID 0x300)
-            else if (packetID == BASE_CONTROLLER_ID) {
-                // Decodifica os dados do frame CAN para a estrutura MotorData
-                motor.motorSpeedRPM = packetData[0] * 256 + packetData[1]; // RPM em 1 RPM
-                motor.motorTorque = (packetData[2] * 256 + packetData[3]) * 0.1; // Torque em 0.1 Nm
-                motor.controllerTemperature = packetData[6] - 40; // Temperatura em °C, com offset de 40
-                motor.motorTemperature = packetData[7] - 40; // Temperatura em °C, com offset de 40
-                motorUpdated = true; // Marca que os dados do motor foram atualizados
-                Serial.println("Recebido: Motor (0x300)"); // Mensagem de debug
-            }
+// ------------------------------------------------------------------
+// --- FUNÇÃO DE CONFIGURAÇÃO (SETUP) ---
+// ------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) delay(10);
+  
+  Serial.println("--- Leitor/Sniffer CAN ESP32 (TJA1050) - Versão Final ---");
+  
+  // Configuração CAN
+  ESP32Can.setPins(CAN_TX_PIN, CAN_RX_PIN);
+  if (ESP32Can.begin(CAN_SPEED)) {
+    Serial.println("Controlador CAN (TWAI) iniciado com sucesso!");
+    Serial.println("Monitorando em 250 kbps nos pinos TX:5 e RX:4...");
+  } else {
+    Serial.println("ERRO: Falha ao iniciar o controlador CAN! Verifique as conexões.");
+    while (1) delay(100);
+  }
+
+  // Conexão Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println();
+  Serial.println("Conectado ao Wi-Fi!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Configuração WebServer
+  server.on("/", HTTP_GET, []() {
+    String html = R"=====(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dados CAN</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .section h2 { margin-top: 0; color: #333; }
+        .data-item { margin: 10px 0; }
+        .label { display: inline-block; width: 200px; font-weight: bold; }
+        .value { color: #007acc; }
+        button { padding: 10px 20px; background-color: #007acc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #005a99; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dados CAN em Tempo Real</h1>
+        
+        <div class="section">
+            <h2>Bateria (ID: 0x120)</h2>
+            <div class="data-item"><span class="label">Corrente (A):</span> <span id="current" class="value">--</span></div>
+            <div class="data-item"><span class="label">Voltagem (V):</span> <span id="voltage" class="value">--</span></div>
+            <div class="data-item"><span class="label">SoC (%):</span> <span id="soc" class="value">--</span></div>
+            <div class="data-item"><span class="label">SoH (%):</span> <span id="soh" class="value">--</span></div>
+            <div class="data-item"><span class="label">Temperatura (°C):</span> <span id="temperature" class="value">--</span></div>
+        </div>
+        
+        <div class="section">
+            <h2>Motor/Controlador (ID: 0x300)</h2>
+            <div class="data-item"><span class="label">RPM do Motor:</span> <span id="motorSpeed" class="value">--</span></div>
+            <div class="data-item"><span class="label">Torque (Nm):</span> <span id="torque" class="value">--</span></div>
+            <div class="data-item"><span class="label">Temp. Motor (°C):</span> <span id="motorTemp" class="value">--</span></div>
+            <div class="data-item"><span class="label">Temp. Controlador (°C):</span> <span id="controllerTemp" class="value">--</span></div>
+        </div>
+        
+        <button onclick="location.reload()">Atualizar</button>
+    </div>
+    
+    <script>
+        function fetchData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('current').textContent = data.battery.current;
+                    document.getElementById('voltage').textContent = data.battery.voltage;
+                    document.getElementById('soc').textContent = data.battery.soc;
+                    document.getElementById('soh').textContent = data.battery.soh;
+                    document.getElementById('temperature').textContent = data.battery.temperature;
+                    
+                    document.getElementById('motorSpeed').textContent = data.motorController.motorSpeedRpm;
+                    document.getElementById('torque').textContent = data.motorController.motorTorque;
+                    document.getElementById('motorTemp').textContent = data.motorController.motorTemperature;
+                    document.getElementById('controllerTemp').textContent = data.motorController.controllerTemperature;
+                })
+                .catch(error => console.error('Erro:', error));
         }
-    }
+        
+        // Atualiza a cada 1 segundo
+        setInterval(fetchData, 1000);
+        fetchData(); // Primeira atualização
+    </script>
+</body>
+</html>
+)=====";
+    server.send(200, "text/html", html);
+  });
 
-    // Processa requisições pendentes do servidor web
-    server.handleClient();
+  server.on("/api/data", HTTP_GET, []() {
+    DynamicJsonDocument doc(1024);
+    JsonObject batteryObj = doc.createNestedObject("battery");
+    batteryObj["current"] = battery.current;
+    batteryObj["voltage"] = battery.voltage;
+    batteryObj["soc"] = battery.soc;
+    batteryObj["soh"] = battery.soh;
+    batteryObj["temperature"] = battery.temperature;
+
+    JsonObject motorControllerObj = doc.createNestedObject("motorController");
+    motorControllerObj["motorSpeedRpm"] = motorController.motorSpeedRpm;
+    motorControllerObj["motorTorque"] = motorController.motorTorque;
+    motorControllerObj["motorTemperature"] = motorController.motorTemperature;
+    motorControllerObj["controllerTemperature"] = motorController.controllerTemperature;
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+    server.send(200, "application/json", jsonString);
+  });
+
+  server.begin();
+  Serial.println("WebServer iniciado!");
+}
+
+// ------------------------------------------------------------------
+// --- LOOP PRINCIPAL ---
+// ------------------------------------------------------------------
+void loop() {
+  // Processa requisições WebServer
+  server.handleClient();
+
+  // Leitura de frames CAN
+  if (ESP32Can.readFrame(&rxFrame)) {
+    // Verifica se é um frame estendido
+    if (rxFrame.flags & TWAI_MSG_FLAG_EXTD) {
+      unsigned long id = rxFrame.identifier;
+      
+      if (id == BASE_BATTERY_ID) {
+        decodeBatteryData(rxFrame.data);
+        Serial.println("Dados da bateria recebidos e decodificados!");
+      } else if (id == BASE_CONTROLLER_ID) {
+        decodeMotorControllerData(rxFrame.data);
+        Serial.println("Dados do motor/controlador recebidos e decodificados!");
+      }
+    }
+  }
+  
+  delay(1);
 }
