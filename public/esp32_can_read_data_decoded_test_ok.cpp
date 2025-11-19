@@ -5,6 +5,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include <string.h> // Adicione esta linha no início do seu arquivo se ainda não estiver lá
 
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---
@@ -85,6 +86,16 @@ void decodeMotorControllerData(byte* data) {
 // ------------------------------------------------------------------
 // --- TAREFA PARA LEITURA CAN ---
 // ------------------------------------------------------------------
+// Supondo que você tenha incluído <string.h> no topo do seu código para memcmp
+
+// ... (mantenha suas definições de BASE_BATTERY_ID, BASE_CONTROLLER_ID, estruturas, etc.)
+
+// Variáveis para armazenar os dados anteriores
+BatteryData batteryPrev = {};
+MotorControllerData motorControllerPrev = {};
+
+// ... (mantenha suas definições de BASE_BATTERY_ID, BASE_CONTROLLER_ID, estruturas, mutex, etc.)
+
 void canTask(void *pvParameters) {
   twai_message_t rxFrame;
 
@@ -95,19 +106,89 @@ void canTask(void *pvParameters) {
         // Extrai o ID standard (11 bits mais baixos)
         uint32_t std_id = rxFrame.identifier & 0x7FF; // 0x7FF = 0b11111111111
 
-        //Serial.print("Frame Standard recebido, ID: 0x");
-        //Serial.println(std_id, HEX);
-
-        // Protege acesso às variáveis de dados (se aplicável)
         if (xSemaphoreTake(dataMutex, portMAX_DELAY) == pdTRUE) {
           if (std_id == BASE_BATTERY_ID) {
-           decodeBatteryData(rxFrame.data);
-            Serial.println("Dados da bateria recebidos e decodificados!");
+            // Decodifica os dados recebidos em uma variável temporária
+            BatteryData tempBattery;
+             tempBattery.current = (int)((rxFrame.data[2] * 256 + rxFrame.data[3]) * 0.1);
+             tempBattery.voltage = (int)((rxFrame.data[0] * 256 + rxFrame.data[1]) * 0.1);
+             tempBattery.soc = (int)rxFrame.data[6];
+             tempBattery.soh = (int)rxFrame.data[7];
+             tempBattery.temperature = (int)rxFrame.data[4];
+             tempBattery.valid = true;
+
+            bool dadosAtualizados = false; // Flag para saber se houve alguma mudança
+            String mudancas = "Dados da bateria mudaram: "; // String para acumular as mudanças
+
+            // Compara campo a campo e adiciona à string de mudanças se for diferente
+            if (tempBattery.current != batteryPrev.current) {
+                mudancas += "Corrente(" + String(batteryPrev.current) + " -> " + String(tempBattery.current) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempBattery.voltage != batteryPrev.voltage) {
+                mudancas += "Voltagem(" + String(batteryPrev.voltage) + " -> " + String(tempBattery.voltage) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempBattery.soc != batteryPrev.soc) {
+                mudancas += "SoC(" + String(batteryPrev.soc) + " -> " + String(tempBattery.soc) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempBattery.soh != batteryPrev.soh) {
+                mudancas += "SoH(" + String(batteryPrev.soh) + " -> " + String(tempBattery.soh) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempBattery.temperature != batteryPrev.temperature) {
+                mudancas += "Temperatura(" + String(batteryPrev.temperature) + " -> " + String(tempBattery.temperature) + ") ";
+                dadosAtualizados = true;
+            }
+
+            if (dadosAtualizados) {
+                // Se houve mudança, atualiza os dados globais e os anteriores
+                battery = tempBattery;
+                batteryPrev = tempBattery;
+                Serial.println(mudancas); // Imprime a string com as mudanças detalhadas
+            } else {
+                //Serial.println("Dados da bateria recebidos, mas NÃO mudaram.");
+            }
           } else if (std_id == BASE_CONTROLLER_ID) {
-           decodeMotorControllerData(rxFrame.data);
-            Serial.println("Dados do motor/controlador recebidos e decodificados!");
+            // Decodifica os dados recebidos em uma variável temporária
+            MotorControllerData tempMotorController;
+            tempMotorController.motorSpeedRpm = (int)(rxFrame.data[0] * 256 + rxFrame.data[1]);
+            tempMotorController.motorTorque = (float)((rxFrame.data[2] * 256 + rxFrame.data[3]) * 0.1);
+            tempMotorController.motorTemperature = (int)(rxFrame.data[7] - 40);
+            tempMotorController.controllerTemperature = (int)(rxFrame.data[6] - 40);
+            tempMotorController.valid = true;
+
+            bool dadosAtualizados = false; // Flag para saber se houve alguma mudança
+            String mudancas = "Dados do motor/controlador mudaram: "; // String para acumular as mudanças
+
+            // Compara campo a campo e adiciona à string de mudanças se for diferente
+            if (tempMotorController.motorSpeedRpm != motorControllerPrev.motorSpeedRpm) {
+                mudancas += "RPM(" + String(motorControllerPrev.motorSpeedRpm) + " -> " + String(tempMotorController.motorSpeedRpm) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempMotorController.motorTorque != motorControllerPrev.motorTorque) {
+                mudancas += "Torque(" + String(motorControllerPrev.motorTorque) + " -> " + String(tempMotorController.motorTorque) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempMotorController.motorTemperature != motorControllerPrev.motorTemperature) {
+                mudancas += "Temp.Motor(" + String(motorControllerPrev.motorTemperature) + " -> " + String(tempMotorController.motorTemperature) + ") ";
+                dadosAtualizados = true;
+            }
+            if (tempMotorController.controllerTemperature != motorControllerPrev.controllerTemperature) {
+                mudancas += "Temp.Controlador(" + String(motorControllerPrev.controllerTemperature) + " -> " + String(tempMotorController.controllerTemperature) + ") ";
+                dadosAtualizados = true;
+            }
+
+            if (dadosAtualizados) {
+                // Se houve mudança, atualiza os dados globais e os anteriores
+                motorController = tempMotorController;
+                motorControllerPrev = tempMotorController;
+                Serial.println(mudancas); // Imprime a string com as mudanças detalhadas
+            } else {
+                //Serial.println("Dados do motor/controlador recebidos, mas NÃO mudaram.");
+            }
           }
-          // Adicione mais 'else if' conforme necessário
           xSemaphoreGive(dataMutex);
         }
       }
@@ -122,7 +203,7 @@ void canTask(void *pvParameters) {
 void webTask(void *pvParameters) {
   while (true) {
     server.handleClient();
-    vTaskDelay(10 / portTICK_PERIOD_MS); // 10ms delay
+    vTaskDelay(1 / portTICK_PERIOD_MS); // 10ms delay
   }
 }
 
@@ -267,7 +348,7 @@ void setup() {
   Serial.println("WebServer iniciado!");
 
   // Cria as tasks
-  xTaskCreate(canTask, "CAN Task", 4096, NULL, 1, NULL);
+  xTaskCreate(canTask, "CAN Task", 4096, NULL, 2, NULL);
   xTaskCreate(webTask, "Web Task", 8192, NULL, 1, NULL);
   
   Serial.println("Tasks criadas com sucesso!");
