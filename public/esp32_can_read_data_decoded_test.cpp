@@ -2,6 +2,9 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
 
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---
@@ -9,7 +12,6 @@
 #define CAN_TX_PIN 5
 #define CAN_RX_PIN 4
 const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
-twai_message_t rxFrame;
 
 // IDs base
 #define BASE_BATTERY_ID     0x120  // ID base para dados da bateria (BMS)
@@ -32,6 +34,9 @@ struct MotorControllerData {
   int controllerTemperature = 0;
   bool valid = false;
 } motorController;
+
+// Mutex para proteger acesso concorrente às variáveis de dados
+SemaphoreHandle_t dataMutex;
 
 // Configuração Wi-Fi e WebServer
 const char* ssid = "CINGUESTS";
@@ -77,13 +82,59 @@ void decodeMotorControllerData(byte* data) {
 }
 
 // ------------------------------------------------------------------
+// --- TAREFA PARA LEITURA CAN ---
+// ------------------------------------------------------------------
+void canTask(void *pvParameters) {
+  twai_message_t rxFrame;
+  
+  while (true) {
+    if (ESP32Can.readFrame(&rxFrame)) {
+      // Verifica se é um frame estendido
+      if (rxFrame.flags & TWAI_MSG_FLAG_EXTD) {
+        unsigned long id = rxFrame.identifier;
+        
+        // Protege acesso às variáveis de dados
+        if (xSemaphoreTake(dataMutex, portMAX_DELAY) == pdTRUE) {
+          if (id == BASE_BATTERY_ID) {
+            decodeBatteryData(rxFrame.data);
+            Serial.println("Dados da bateria recebidos e decodificados!");
+          } else if (id == BASE_CONTROLLER_ID) {
+            decodeMotorControllerData(rxFrame.data);
+            Serial.println("Dados do motor/controlador recebidos e decodificados!");
+          }
+          xSemaphoreGive(dataMutex);
+        }
+      }
+    }
+    vTaskDelay(1 / portTICK_PERIOD_MS); // 1ms delay
+  }
+}
+
+// ------------------------------------------------------------------
+// --- TAREFA PARA PROCESSAMENTO WEB ---
+// ------------------------------------------------------------------
+void webTask(void *pvParameters) {
+  while (true) {
+    server.handleClient();
+    vTaskDelay(10 / portTICK_PERIOD_MS); // 10ms delay
+  }
+}
+
+// ------------------------------------------------------------------
 // --- FUNÇÃO DE CONFIGURAÇÃO (SETUP) ---
 // ------------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10);
   
-  Serial.println("--- Leitor/Sniffer CAN ESP32 (TJA1050) - Versão Final ---");
+  Serial.println("--- Leitor/Sniffer CAN ESP32 (TJA1050) - Versão Final com Tasks ---");
+  
+  // Inicializa mutex
+  dataMutex = xSemaphoreCreateMutex();
+  if (dataMutex == NULL) {
+    Serial.println("ERRO: Falha ao criar mutex!");
+    return;
+  }
   
   // Configuração CAN
   ESP32Can.setPins(CAN_TX_PIN, CAN_RX_PIN);
@@ -180,51 +231,46 @@ void setup() {
   });
 
   server.on("/api/data", HTTP_GET, []() {
-    DynamicJsonDocument doc(1024);
-    JsonObject batteryObj = doc.createNestedObject("battery");
-    batteryObj["current"] = battery.current;
-    batteryObj["voltage"] = battery.voltage;
-    batteryObj["soc"] = battery.soc;
-    batteryObj["soh"] = battery.soh;
-    batteryObj["temperature"] = battery.temperature;
+    // Protege acesso às variáveis de dados
+    if (xSemaphoreTake(dataMutex, portMAX_DELAY) == pdTRUE) {
+      DynamicJsonDocument doc(1024);
+      JsonObject batteryObj = doc.createNestedObject("battery");
+      batteryObj["current"] = battery.current;
+      batteryObj["voltage"] = battery.voltage;
+      batteryObj["soc"] = battery.soc;
+      batteryObj["soh"] = battery.soh;
+      batteryObj["temperature"] = battery.temperature;
 
-    JsonObject motorControllerObj = doc.createNestedObject("motorController");
-    motorControllerObj["motorSpeedRpm"] = motorController.motorSpeedRpm;
-    motorControllerObj["motorTorque"] = motorController.motorTorque;
-    motorControllerObj["motorTemperature"] = motorController.motorTemperature;
-    motorControllerObj["controllerTemperature"] = motorController.controllerTemperature;
+      JsonObject motorControllerObj = doc.createNestedObject("motorController");
+      motorControllerObj["motorSpeedRpm"] = motorController.motorSpeedRpm;
+      motorControllerObj["motorTorque"] = motorController.motorTorque;
+      motorControllerObj["motorTemperature"] = motorController.motorTemperature;
+      motorControllerObj["controllerTemperature"] = motorController.controllerTemperature;
 
-    String jsonString;
-    serializeJson(doc, jsonString);
-    server.send(200, "application/json", jsonString);
+      String jsonString;
+      serializeJson(doc, jsonString);
+      server.send(200, "application/json", jsonString);
+      
+      xSemaphoreGive(dataMutex);
+    } else {
+      server.send(500, "text/plain", "Erro de sincronização");
+    }
   });
 
   server.begin();
   Serial.println("WebServer iniciado!");
+
+  // Cria as tasks
+  xTaskCreate(canTask, "CAN Task", 4096, NULL, 1, NULL);
+  xTaskCreate(webTask, "Web Task", 8192, NULL, 1, NULL);
+  
+  Serial.println("Tasks criadas com sucesso!");
 }
 
 // ------------------------------------------------------------------
 // --- LOOP PRINCIPAL ---
 // ------------------------------------------------------------------
 void loop() {
-  // Processa requisições WebServer
-  server.handleClient();
-
-  // Leitura de frames CAN
-  if (ESP32Can.readFrame(&rxFrame)) {
-    // Verifica se é um frame estendido
-    if (rxFrame.flags & TWAI_MSG_FLAG_EXTD) {
-      unsigned long id = rxFrame.identifier;
-      
-      if (id == BASE_BATTERY_ID) {
-        decodeBatteryData(rxFrame.data);
-        Serial.println("Dados da bateria recebidos e decodificados!");
-      } else if (id == BASE_CONTROLLER_ID) {
-        decodeMotorControllerData(rxFrame.data);
-        Serial.println("Dados do motor/controlador recebidos e decodificados!");
-      }
-    }
-  }
-  
-  delay(1);
+  // O loop principal agora está vazio pois as tarefas estão rodando
+  vTaskDelay(1000 / portTICK_PERIOD_MS); // 1 segundo delay
 }
