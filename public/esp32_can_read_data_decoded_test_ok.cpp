@@ -16,7 +16,8 @@ const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
 // IDs base
 #define BASE_BATTERY_ID     0x120  // ID base para dados da bateria (BMS)
 #define BASE_CONTROLLER_ID  0x300  // ID base para dados do motor/controlador
-
+#define ID_MASK             0x7F0  // Máscara para comparar os bits mais altos (0x120 & 0x300 compartilham os 12 bits mais altos)
+     
 // Variáveis para armazenar os dados decodificados
 struct BatteryData {
   int current = 0;
@@ -86,30 +87,35 @@ void decodeMotorControllerData(byte* data) {
 // ------------------------------------------------------------------
 void canTask(void *pvParameters) {
   twai_message_t rxFrame;
-  
+
   while (true) {
     if (ESP32Can.readFrame(&rxFrame)) {
-      // Verifica se é um frame estendido
-      if (rxFrame.flags & TWAI_MSG_FLAG_EXTD) {
-        unsigned long id = rxFrame.identifier;
-        
-        // Protege acesso às variáveis de dados
+      // Verifica SE NÃO É um frame estendido (ou seja, é standard)
+      if (!(rxFrame.flags & TWAI_MSG_FLAG_EXTD)) {
+        // Extrai o ID standard (11 bits mais baixos)
+        uint32_t std_id = rxFrame.identifier & 0x7FF; // 0x7FF = 0b11111111111
+
+        //Serial.print("Frame Standard recebido, ID: 0x");
+        //Serial.println(std_id, HEX);
+
+        // Protege acesso às variáveis de dados (se aplicável)
         if (xSemaphoreTake(dataMutex, portMAX_DELAY) == pdTRUE) {
-          if (id == BASE_BATTERY_ID) {
-            decodeBatteryData(rxFrame.data);
+          if (std_id == BASE_BATTERY_ID) {
+           decodeBatteryData(rxFrame.data);
             Serial.println("Dados da bateria recebidos e decodificados!");
-          } else if (id == BASE_CONTROLLER_ID) {
-            decodeMotorControllerData(rxFrame.data);
+          } else if (std_id == BASE_CONTROLLER_ID) {
+           decodeMotorControllerData(rxFrame.data);
             Serial.println("Dados do motor/controlador recebidos e decodificados!");
           }
+          // Adicione mais 'else if' conforme necessário
           xSemaphoreGive(dataMutex);
         }
       }
+      // Se for extended, ignora
     }
     vTaskDelay(1 / portTICK_PERIOD_MS); // 1ms delay
   }
 }
-
 // ------------------------------------------------------------------
 // --- TAREFA PARA PROCESSAMENTO WEB ---
 // ------------------------------------------------------------------
