@@ -103,7 +103,7 @@ router.post('/can/:deviceId', addCanMessage);
 
 /**
  * @swagger
- * /can-
+ * /can-data:
  *   get:
  *     summary: Retorna os últimos N frames CAN
  *     tags: [Vehicle Data]
