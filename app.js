@@ -24,6 +24,7 @@ app.use('/api', canRoutes);
 // Servir arquivos estáticos da pasta 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
+/**/
 // Rota para acessar o dashboard
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -32,24 +33,6 @@ app.get('/dashboard', (req, res) => {
 // Rota raiz
 app.get('/', (req, res) => {
   res.json({ message: 'API CAN está funcionando!' });
-});
-
-app.get('/api/dashboard-data', async (req, res) => {
-  try {
-    const apiUrl = process.env.API_URL;
-    if (!apiUrl) {
-      return res.status(500).send('URL da API não configurada.');
-    }
-    const apiResponse = await fetch(apiUrl);
-    if (!apiResponse.ok) {
-      throw new Error(`Erro na API externa: ${apiResponse.statusText}`);
-    }
-    const data = await apiResponse.json();
-    res.json(data);
-  } catch (error) {
-    console.error('Erro ao buscar dados da API:', error);
-    res.status(500).json({ error: 'Falha ao buscar dados para o dashboard.' });
-  }
 });
 
 // Swagger

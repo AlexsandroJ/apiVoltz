@@ -79,7 +79,7 @@ async function addData() {
   };
 
   try {
-    const response = await axios.post(`${uri}/api`, mockData);
+    const response = await axios.post(`${uri}/api/device`, mockData);
     console.log(`📊 Dados de teste inseridos com sucesso`);
     console.log(`🔑 deviceId:`, response.data.deviceId || response.data.savedData.deviceId);
     deviceId = response.data.deviceId;

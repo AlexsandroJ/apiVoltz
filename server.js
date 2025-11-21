@@ -28,8 +28,6 @@ wss.on('connection',async (ws, req) => {
   ws.send(JSON.stringify({ message: 'Conectado ao servidor WebSocket' }));
 });
 
-
-
 connectDB()
   .then(() => {
     server.listen(PORT, async () => {

@@ -9,7 +9,7 @@
  * - Exportar dados em formatos CSV e JSON.
  * 
  * @module VehicleController
- * @author Seu Nome
+ * @author Alexsandro J Silva
  * @version 1.0.0
  * @since 2025-11-21
  */
@@ -28,7 +28,7 @@ const VehicleData = require('../models/canDataModels');
  * @throws {Error} Se ocorrer erro ao salvar no banco de dados.
  * 
  * @example
- * POST /api/vehicle-data
+ * POST /api/device
  * Body: {
  *   "deviceId": "voltz-20250121-143022",
  *   "speed": 45,
@@ -51,78 +51,6 @@ exports.createVehicleData = async (req, res) => {
 };
 
 /**
- * Retorna o último registro do veículo (mais recente).
- * 
- * @async
- * @function getLatestVehicleData
- * @param {object} req - Objeto de requisição Express.
- * @param {object} res - Objeto de resposta Express.
- * @returns {Promise<void>}
- * @throws {Error} Se ocorrer erro ao buscar no banco de dados.
- * 
- * @example
- * GET /api/vehicle-data/latest
- * Response: { "_id": "...", "deviceId": "...", "timestamp": "...", ... }
- */
-exports.getLatestVehicleData = async (req, res) => {
-  try {
-    const data = await VehicleData
-      .findOne()
-      .sort({ timestamp: -1 })
-      .exec();
-
-    if (!data) {
-      return res.status(404).json({ error: 'Nenhum dado encontrado' });
-    }
-
-    res.json(data);
-  } catch (error) {
-    console.error('Erro ao buscar último dado:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-};
-
-/**
- * Retorna o histórico de dados (últimos N registros).
- * 
- * @async
- * @function getVehicleHistory
- * @param {object} req - Objeto de requisição Express.
- * @param {object} req.query - Parâmetros da query string.
- * @param {number} [req.query.limit=50] - Número máximo de registros a retornar.
- * @param {string} [req.query.deviceId] - Filtrar por deviceId específico.
- * @param {object} res - Objeto de resposta Express.
- * @returns {Promise<void>}
- * @throws {Error} Se ocorrer erro ao buscar no banco de dados.
- * 
- * @example
- * GET /api/vehicle-data/history?limit=20&deviceId=voltz-20250121
- * Response: [{ "_id": "...", "deviceId": "...", ... }, ...]
- */
-exports.getVehicleHistory = async (req, res) => {
-  const limit = parseInt(req.query.limit) || 50;
-  const deviceId = req.query.deviceId;
-
-  try {
-    let query = {};
-    if (deviceId) {
-      query.deviceId = deviceId;
-    }
-
-    const data = await VehicleData
-      .find(query)
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .exec();
-
-    res.json(data);
-  } catch (error) {
-    console.error('Erro ao buscar histórico:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-};
-
-/**
  * Retorna todos os registros de um dispositivo específico.
  * 
  * @async
@@ -135,7 +63,7 @@ exports.getVehicleHistory = async (req, res) => {
  * @throws {Error} Se ocorrer erro ao buscar no banco de dados.
  * 
  * @example
- * GET /api/vehicle-data/device/voltz-20250121-143022
+ * GET /api/device/voltz-20250121-143022
  * Response: [{ "_id": "...", "timestamp": "...", ... }]
  */
 exports.getVehicleDataByDeviceId = async (req, res) => {
