@@ -29,18 +29,22 @@ const vehicleDataSchema = new mongoose.Schema({
 
   // === DADOS BRUTOS DA REDE CAN (para histórico e depuração) ===
   canMessages: [{
+    timestamp: {
+      type: Date,
+      default: Date.now,
+      index: true // Para consultas por tempo
+    },
     canId: {
       type: String,
       required: false,
-      trim: true
     },
-    data: {
-      type: String,
-      required: true
-    },
+    data: [{
+      type: Number,
+      required: false
+    }],
     dlc: {
       type: Number,
-      required: true
+      required: false
     },
     rtr: {
       type: Boolean,
@@ -69,9 +73,8 @@ const vehicleDataSchema = new mongoose.Schema({
   motor: {
     rpm: { type: Number },
     power: { type: Number }, // kW
-    regenLevel: { type: Number, min: 0, max: 100 }, // %
     motorTemp: { type: Number },
-    inverterTemp: { type: Number }
+    controlTemp: { type: Number }
   },
 
   // Localização
@@ -89,46 +92,11 @@ const vehicleDataSchema = new mongoose.Schema({
     }
   },
 
-  // Modo de condução
-  driveMode: {
-    type: String,
-    enum: ['eco', 'norm', 'sport'],
-    default: 'norm'
-  },
-
   // Autonomia
   range: {
     type: Number,
     min: 0
   },
-
-  // Status do veículo
-  vehicleStatus: {
-    type: String,
-    enum: ['ligado', 'desligado', 'carregando', 'pronto'],
-    default: 'desligado'
-  },
-
-  // Odômetro
-  odometer: {
-    type: Number,
-    min: 0
-  },
-
-  // Alertas e erros
-  alerts: [{
-    code: String,
-    message: String,
-    severity: {
-      type: String,
-      enum: ['info', 'warning', 'error'],
-      default: 'info'
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now
-    }
-  }]
 
 }, {
   timestamps: true, // createdAt, updatedAt

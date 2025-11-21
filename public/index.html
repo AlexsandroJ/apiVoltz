@@ -14,10 +14,8 @@
   <div class="container">
     <header>
       <h1>⚡ Voltz - Dashboard</h1>
-      <p class="subtitle">
-        Monitoramento em Tempo Real
-        <span class="status-indicator" id="status-indicator"></span>
-      </p>
+      <p class="subtitle">Monitoramento em Tempo Real</p>
+      <span class="status-indicator" id="status-indicator"></span>
       <button id="theme-toggle" title="Alternar tema">☀️</button>
     </header>
 
@@ -68,14 +66,14 @@
         <div class="value" id="bms-soh">--</div>
         <div class="unit">%</div>
       </div>
-
+      <div class="data-card">
+        <h2>🌡️ BMS</h2>
+        <div class="value" id="bms-temp">--</div>
+        <div class="unit">°C</div>
+      </div>
     </div>
 
-    <div class="data-card">
-      <h2>🌡️ BMS</h2>
-      <div class="value" id="bms-temp">--</div>
-      <div class="unit">°C</div>
-    </div>
+
     <!-- Área do Mapa -->
     <div class="map-section">
       <h2>📍 Localização da Moto</h2>
@@ -84,8 +82,12 @@
 
     <!-- Área de Log CAN -->
     <div class="can-section">
-      <h2>📡 Rede CAN - Mensagens Recebidas</h2>
+      <h2 class="can-header">
+        📡 Rede CAN - Mensagens Recebidas
+        <button id="download-can-data">📥</button>
+      </h2>
       <div class="can-table-container">
+
         <table>
           <thead>
             <tr>
@@ -96,9 +98,7 @@
             </tr>
           </thead>
           <tbody id="can-body">
-            <tr>
-              <td colspan="5" class="empty">Carregando mensagens...</td>
-            </tr>
+            
           </tbody>
         </table>
       </div>

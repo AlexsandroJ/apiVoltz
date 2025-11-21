@@ -1,19 +1,31 @@
 // Elementos do DOM
+
+// Dados BMS
+const bmsCurrent = document.getElementById('bms-current');
+const bmsVoltage = document.getElementById('bms-voltage');
+const bmsSoc = document.getElementById('bms-soc');
+const bmsSoH = document.getElementById('bms-soh');
+const bmsTemp = document.getElementById('bms-temp');
+
+// Dados Controller
 const rpm = document.getElementById('rpm');
 const torque = document.getElementById('torque');
 const tempMotor = document.getElementById('temp-motor');
 const tempBatt = document.getElementById('temp-batt');
-const bmsVoltage = document.getElementById('bms-voltage');
-const bmsCurrent = document.getElementById('bms-current');
-const bmsSoc = document.getElementById('bms-soc');
-const bmsSoH = document.getElementById('bms-soh');
-const bmsTemp = document.getElementById('bms-temp');
+
 const themeToggle = document.getElementById('theme-toggle');
+const statusIndicator = document.getElementById('status-indicator');
+const canBody = document.querySelector('#can-body');
+
+// Adiciona evento ao botão
+document.getElementById('download-can-data')?.addEventListener('click', downloadCanData);
+
 // Nome dos IDs CAN conhecidos
 const canIdNames = {
   '0x120': 'BMS Status',
   '0x300': 'Motor Status',
 };
+
 // Dados atuais
 const liveData = {
   rpm: '--',
@@ -27,10 +39,66 @@ const liveData = {
   bmsTemp: '--',
   lastCoords: null
 };
+
 // Mapa - Leaflet
 let map;
 let bikeMarker;
 let lat, lon;
+
+// Função para formatar o timestamp (ex: 14:30:25)
+function formatTimestamp(date) {
+  const d = new Date(date);
+  return d.toLocaleTimeString(); // Formato HH:MM:SS
+}
+
+// Função para atualizar a tabela CAN a partir da API
+function updateCanTableFromApi(messages) {
+  canBody.innerHTML = '';
+  for (let i = 0; i < messages.length; i++) {
+    const element = messages[i];
+    const tr = document.createElement('tr');
+    tr.classList.add('highlight');
+    tr.innerHTML = `
+      <td>${formatTimestamp(element.timestamp)}</td>
+      <td>0x${element.canId.toString(16).toUpperCase()}</td>
+      <td>${Array.isArray(element.data) ? element.data.join(', ') : element.data}</td>
+    `;
+    canBody.appendChild(tr);
+    setTimeout(() => tr.classList.remove('highlight'), 500);
+  }
+}
+
+// Adicione esta função ao seu script
+async function fetchRecentCanData() {
+  try {
+    const response = await fetch('/api/can-data'); // Últimos 50 frames
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const canMessages = await response.json();
+
+    if (!canMessages || canMessages.length === 0) {
+      canBody.innerHTML = `
+    <tr>
+      <td colspan="3" class="empty">
+        Nenhum frame CAN recebido.
+      </td>
+    </tr>
+  `;
+    } else {
+      // Atualiza a tabela com os frames CAN recebidos
+      updateCanTableFromApi(canMessages);
+    }
+  } catch (error) {
+    console.error('Erro ao buscar dados CAN:', error);
+    canBody.innerHTML = `
+  <tr>
+    <td colspan="3" class="empty" style="color: #f44336;">
+      Falha na conexão com a API.
+    </td>
+  </tr>
+`;
+  }
+}
+
 // Inicializa o mapa
 function initMap() {
   const initialCoords = [-8.055581, -34.951640];
@@ -40,20 +108,18 @@ function initMap() {
     tileSize: 512,
     zoomOffset: -1
   }).addTo(map);
-  // Cria um ícone personalizado de moto
+
   const bikeIcon = L.icon({
-    iconUrl: 'https://www.jav.com.br/wp-content/uploads/2017/03/map-marker-icon.png', // Ícone de moto (tamanho ~32x32)
-    iconSize: [32, 32],        // Tamanho do ícone
-    iconAnchor: [16, 32],      // Ponto de ancoragem (base do ícone)
-    popupAnchor: [0, -32]      // De onde o popup abre
+    iconUrl: 'https://www.jav.com.br/wp-content/uploads/2017/03/map-marker-icon.png',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32]
   });
-  // Adiciona o marcador com o ícone personalizado
-  bikeMarker = L.marker(initialCoords, { 
-    icon: bikeIcon,
-    title: 'Moto Voltz' 
-  }).addTo(map);
+
+  bikeMarker = L.marker(initialCoords, { icon: bikeIcon, title: 'Moto Voltz' }).addTo(map);
   bikeMarker.bindPopup('📍 Moto Voltz <br><small>Em movimento</small>');
 }
+
 // Atualiza posição no mapa
 function updateMapPosition(lat, lon) {
   if (bikeMarker) {
@@ -66,70 +132,7 @@ function updateMapPosition(lat, lon) {
   }
   liveData.lastCoords = [lat, lon];
 }
-// Atualiza tabela CAN
-function updateCanTable(messages) {
-  canBody.innerHTML = '';
-  for (let x = 0; x < messages.length; x++) {
-    let data = messages[x].canMessages;
-    for (let index = 0; index < data.length; index++) {
-      let element = data[index];
-      let tr = document.createElement('tr');
-      tr.classList.add('highlight');
-      tr.innerHTML = `
-      <td><strong>${messages[x].deviceId}</strong></td>
-      <td>${element.canId}</td>
-      <td>${element.data}</td>
-    `;
-      canBody.appendChild(tr);
-      setTimeout(() => tr.classList.remove('highlight'), 500);
-    }
-  }
-}
-// Busca dados da API
-async function fetchCanData() {
-  try {
-    const dashboardApiUrl = '/api/dashboard-data';
-    // Faz a requisição e espera pela resposta
-    const response = await fetch(dashboardApiUrl);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const messages = await response.json();
-    if (!messages || messages.length === 0) {
-      console.warn('Nenhum dado recebido da API');
-      statusIndicator.classList.remove('online');
-      canBody.innerHTML = `
-      <tr>
-        <td colspan="5" class="empty" ">
-          Nenhum dado recebido da API.
-        </td>
-      </tr>
-    `;
-    } else {
-      const { gpsLocation, speed, battery, driveMode, motor } = messages[0];
-      const { lat, lon } = gpsLocation;
-      speedEl.textContent = messages[0].speed;
-      batteryEl.textContent = messages[0].battery.soc;
-      rangeEl.textContent = messages[0].range;
-      tempBattEl.textContent = messages[0].battery.temperature;
-      driveModeEl.textContent = messages[0].driveMode;
-      powerEl.textContent = messages[0].motor.power;
-      updateCanTable(messages);
-      updateMapPosition(lat, lon);
-      statusIndicator.classList.add('online');
-    }
-  } catch (error) {
-    /*
-    console.error('Erro ao buscar dados:', error);
-    statusIndicator.classList.remove('online');
-    canBody.innerHTML = `
-      <tr>
-        <td colspan="5" class="empty" style="color: #f44336;">
-          Falha na conexão com a API.
-        </td>
-      </tr>
-    `;
-    */
-  }
-}
+
 // Alternar tema
 function toggleTheme() {
   const isDark = document.body.classList.contains('dark-theme');
@@ -138,6 +141,7 @@ function toggleTheme() {
   localStorage.setItem('theme', newTheme);
   themeToggle.textContent = isDark ? '🌙' : '☀️';
 }
+
 // Carrega tema salvo
 function loadSavedTheme() {
   const saved = localStorage.getItem('theme');
@@ -146,12 +150,107 @@ function loadSavedTheme() {
   document.body.className = theme;
   themeToggle.textContent = theme === 'dark-theme' ? '☀️' : '🌙';
 }
-// Eventos
+
+function downloadCanData() {
+  // Cria um link temporário para download
+  const link = document.createElement('a');
+  link.href = '/api/export-can-data-csv'; // Endpoint que você criou
+  link.download = `can-data-${Date.now()}.csv`; // Nome do arquivo
+  link.click(); // Clica no link programaticamente
+}
+
+// WebSocket
+let ws = null;
+const wsUrl = `ws://${window.location.hostname}:${window.location.port}`;
+
+function connectWebSocket() {
+  try {
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('🔌 Front Conectado WebSocket do servidor');
+      statusIndicator?.classList.add('online');
+      
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (typeof data !== 'object' || data === null) {
+          console.error('❌ Dados recebidos inválidos:', event.data);
+          return;
+        }
+
+        console.log('📩 Front Dados recebidos via WebSocket:', data);
+
+        // ✅ Processa dados decodificados recebidos do servidor
+        if (data.type === 'decodedData') {
+          if (data.source === 'battery') {
+            const { current, voltage, soc, soh, temperature } = data.decoded; // ✅ Acesse data.decoded
+            bmsCurrent.textContent = current !== undefined ? current : '--';
+            bmsVoltage.textContent = voltage !== undefined ? voltage : '--';
+            bmsSoc.textContent = soc !== undefined ? soc : '--';
+            bmsSoH.textContent = soh !== undefined ? soh : '--';
+            bmsTemp.textContent = temperature !== undefined ? temperature : '--';
+
+          } else if (data.source === 'motorController') {
+            const { motorSpeedRpm, motorTorque, motorTemperature, controllerTemperature } = data.decoded; // ✅ Acesse data.decoded
+            rpm.textContent = motorSpeedRpm !== undefined ? motorSpeedRpm : '--';
+            torque.textContent = motorTorque !== undefined ? motorTorque.toFixed(1) : '--';
+            tempMotor.textContent = motorTemperature !== undefined ? motorTemperature : '--';
+            tempBatt.textContent = controllerTemperature !== undefined ? controllerTemperature : '--';
+
+          }
+        }
+
+        // ✅ Atualiza tabela CAN em tempo real com frames brutos recebidos
+        if (data.type === 'canFrame') {
+          const tr = document.createElement('tr');
+          tr.classList.add('highlight');
+          tr.innerHTML = `
+    <td>${formatTimestamp(new Date())}</td> <!-- Timestamp -->
+    <td>0x${data.id.toString(16).toUpperCase()}</td> <!-- ID -->
+    <td>${Array.isArray(data.data) ? data.data.join(', ') : data.data}</td> <!-- Dados -->
+  `;
+          canBody.prepend(tr); // Adiciona no topo
+          setTimeout(() => tr.classList.remove('highlight'), 500);
+
+          // Remove linhas antigas para não sobrecarregar a tabela
+          if (canBody.children.length > 20) {
+            canBody.removeChild(canBody.lastChild);
+          }
+        }
+
+      } catch (error) {
+        console.error('❌ Erro ao processar mensagem do WebSocket:', error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('🔌 WebSocket desconectado');
+      statusIndicator?.classList.remove('online');
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    ws.onerror = (error) => {
+      console.error('❌ Erro no WebSocket:', error);
+      statusIndicator?.classList.remove('online');
+    };
+  } catch (error) {
+    console.error('❌ Erro ao criar conexão WebSocket:', error);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadSavedTheme();
   initMap();
-  fetchCanData();
+  connectWebSocket();
+
+  fetchRecentCanData(); // Opcional: carregar dados iniciais da API
 });
+
 themeToggle?.addEventListener('click', toggleTheme);
-// Atualização automática
-setInterval(fetchCanData, 5000);
+
+// Opcional: atualizar dados CAN da API a cada 5 segundos
+//setInterval(fetchRecentCanData, 5000);

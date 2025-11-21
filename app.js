@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const canRoutes = require('./routes/canRoutes');
 const swagger = require('./swagger/swagger');
-require('dotenv').config(); // Lê o .env
+require('dotenv').config();
 const bodyParser = require('body-parser');
 
 // Inicializa o app
@@ -32,33 +32,27 @@ app.get('/dashboard', (req, res) => {
 // Rota raiz
 app.get('/', (req, res) => {
   res.json({ message: 'API CAN está funcionando!' });
- 
 });
+
 app.get('/api/dashboard-data', async (req, res) => {
-    try {
-        // As variáveis de ambiente são acessadas somente no servidor
-        const apiUrl = process.env.API_URL;
-
-        if (!apiUrl) {
-            return res.status(500).send('URL da API não configurada.');
-        }
-        // Faz a requisição para a API externa. Você pode usar 'fetch' ou 'axios'.
-        const apiResponse = await fetch(apiUrl);
-
-        if (!apiResponse.ok) {
-            throw new Error(`Erro na API externa: ${apiResponse.statusText}`);
-        }
-
-        const data = await apiResponse.json();
-
-        // Envia os dados da API de volta para o cliente (dashboard)
-        res.json(data);
-    } catch (error) {
-        console.error('Erro ao buscar dados da API:', error);
-        res.status(500).json({ error: 'Falha ao buscar dados para o dashboard.' });
+  try {
+    const apiUrl = process.env.API_URL;
+    if (!apiUrl) {
+      return res.status(500).send('URL da API não configurada.');
     }
+    const apiResponse = await fetch(apiUrl);
+    if (!apiResponse.ok) {
+      throw new Error(`Erro na API externa: ${apiResponse.statusText}`);
+    }
+    const data = await apiResponse.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar dados da API:', error);
+    res.status(500).json({ error: 'Falha ao buscar dados para o dashboard.' });
+  }
 });
+
 // Swagger
 swagger(app);
 
-module.exports = app;
+module.exports = { app };
