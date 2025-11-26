@@ -9,22 +9,37 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const clients = new Set();
 
-wss.on('connection',async (ws, req) => {
-  console.log('🔌 Cliente WebSocket conectado:', req.socket.remoteAddress);
+wss.on('connection', async (ws, req) => {
+
+  if (ws.deviceId) {
+    console.log(`🔌 Esp conectado : ${req.socket.remoteAddress}`);
+  } else {
+    console.log('🔌 Dashboard conectado');
+  }
+
   clients.add(ws);
 
   ws.on('message', (message) => handleWebSocketMessage(ws, message, clients));
 
   ws.on('close', () => {
-    console.log('❌🔌 Cliente WebSocket desconectado');
+    if (ws.deviceId) {
+      console.log(`❌🔌 Esp Desconectado : ${ws.deviceId}`);
+    } else {
+      console.log('❌🔌 Dashboard desconectado');
+    }
+
     clients.delete(ws);
   });
 
   ws.on('error', (error) => {
+    if (ws.deviceId) {
+      console.log(`❌🔌 Erro no Esp : ${ws.deviceId}`);
+    } else {
+      console.log('❌🔌 Erro no Dashboard');
+    }
     console.error('❌ Erro no WebSocket:', error);
     clients.delete(ws);
   });
-
   ws.send(JSON.stringify({ message: 'Conectado ao servidor WebSocket' }));
 });
 

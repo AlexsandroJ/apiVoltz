@@ -67,12 +67,15 @@ exports.createVehicleData = async (req, res) => {
  * Response: [{ "_id": "...", "timestamp": "...", ... }]
  */
 exports.getVehicleDataByDeviceId = async (req, res) => {
+  const limit = parseInt(req.query.limit) || 50;
   const { deviceId } = req.params;
 
   try {
     const data = await VehicleData
       .find({ deviceId: deviceId })
       .sort({ timestamp: -1 })
+      .lean() // reduzir o uso de memória
+      .limit(limit)
       .exec();
 
     if (data.length === 0) {
@@ -126,7 +129,10 @@ exports.addCanMessage = async (req, res) => {
     }
 
     // Procura um documento existente com o deviceId (ou cria um novo)
-    let vehicleData = await VehicleData.findOne({ deviceId }).sort({ timestamp: -1 });
+    let vehicleData = await VehicleData
+    .findOne({ deviceId })
+    .sort({ timestamp: -1 })
+    .lean() // reduzir o uso de memória
 
     if (vehicleData) {
       // Adiciona o novo CAN message ao array existente
@@ -183,6 +189,7 @@ exports.getRecentCanData = async (req, res) => {
     const data = await VehicleData
       .find({ canMessages: { $exists: true, $ne: [] } })
       .sort({ timestamp: -1 })
+      .lean() // reduzir o uso de memória
       .limit(limit)
       .select('deviceId timestamp canMessages') // Apenas campos relevantes
       .exec();
@@ -208,11 +215,12 @@ exports.getRecentCanData = async (req, res) => {
 };
 
 /**
- * Exporta todos os dados CAN do banco como CSV.
+ * Exporta todos os dados CAN do banco como CSV (com streaming para evitar memory leak).
  * 
  * @async
  * @function exportAllCanDataAsCsv
  * @param {object} req - Objeto de requisição Express.
+ * @param {string} [req.query.deviceId] - Filtrar por deviceId específico (opcional).
  * @param {object} res - Objeto de resposta Express.
  * @returns {Promise<void>}
  * @throws {Error} Se ocorrer erro ao buscar ou formatar os dados.
@@ -223,46 +231,37 @@ exports.getRecentCanData = async (req, res) => {
  */
 exports.exportAllCanDataAsCsv = async (req, res) => {
   try {
-    // Busca todos os documentos com canMessages
-    const allData = await VehicleData
-      .find({ canMessages: { $exists: true, $ne: [] } })
-      .select('deviceId timestamp canMessages')
-      .sort({ timestamp: 1 })
-      .exec();
+    const { deviceId } = req.query;
 
-    // Cabeçalhos do CSV
-    const headers = [
-      'timestamp',
-      'canId',
-      'data',
-      'dlc',
-      'rtr'
-    ];
+    // Configura cabeçalhos da resposta
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=can-data-${Date.now()}.csv`);
 
-    // Cria o conteúdo CSV
-    let csvContent = headers.join(',') + '\n';
+    // Escreve cabeçalhos do CSV
+    const headers = ['timestamp', 'canId', 'data', 'dlc', 'rtr'];
+    res.write(headers.join(',') + '\n');
 
-    // Achata os arrays de canMessages para uma lista única
-    for (const doc of allData) {
+    // Cria query com filtro opcional
+    const query = { canMessages: { $exists: true, $ne: [] } };
+    if (deviceId) query.deviceId = deviceId;
+
+    // Usa cursor para processar documentos um por um (streaming)
+    const cursor = VehicleData.find(query).sort({ timestamp: 1 }).cursor();
+
+    for await (const doc of cursor) {
       for (const msg of doc.canMessages) {
-        // Formata os dados para CSV
         const row = [
-          `"${msg.timestamp.toISOString()}"`, // ← Usa o timestamp do frame
+          `"${msg.timestamp?.toISOString() || new Date(doc.timestamp).toISOString()}"`,
           `"0x${msg.canId.toString(16).toUpperCase()}"`,
           `"${Array.isArray(msg.data) ? msg.data.join(' ') : msg.data}"`,
           msg.dlc || 0,
           msg.rtr ? 'true' : 'false'
         ];
-        csvContent += row.join(',') + '\n';
+        res.write(row.join(',') + '\n');
       }
     }
 
-    // Define o cabeçalho para download CSV
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=can-data-${Date.now()}.csv`);
-
-    // Envia o conteúdo CSV
-    res.send(csvContent);
+    res.end(); // Finaliza a resposta
   } catch (error) {
     console.error('Erro ao exportar dados CAN em CSV:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });

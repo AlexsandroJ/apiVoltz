@@ -182,7 +182,7 @@ function connectWebSocket() {
           return;
         }
 
-        console.log('📩 Front Dados recebidos via WebSocket:', data);
+        //console.log('📩 Front Dados recebidos via WebSocket:', data);
 
         // ✅ Processa dados decodificados recebidos do servidor
         if (data.type === 'decodedData') {
@@ -200,7 +200,9 @@ function connectWebSocket() {
             torque.textContent = motorTorque !== undefined ? motorTorque.toFixed(1) : '--';
             tempMotor.textContent = motorTemperature !== undefined ? motorTemperature : '--';
             tempBatt.textContent = controllerTemperature !== undefined ? controllerTemperature : '--';
-
+            if( motorSpeedRpm != 0){
+              console.log("🚴‍♂️ Moto em movimento. Atualizando mapa...");
+            }
           }
         }
 

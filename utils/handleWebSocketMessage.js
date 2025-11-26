@@ -18,8 +18,6 @@ const { decodeCanFrame, } = require('../utils/canDecoder');
 const VehicleData = require('../models/canDataModels'); // Importe seu modelo
 const uri = `${process.env.API_URL}`;
 
-let deviceId = '';
-
 /**
  * Adiciona um frame CAN diretamente no MongoDB.
  * 
@@ -33,31 +31,38 @@ let deviceId = '';
  * @returns {Promise<void>}
  * @throws {Error} Se o frame for inválido ou ocorrer erro de banco de dados.
  */
-async function addCanDirectly(canFrame) {
+async function addCanDirectly(canFrame, deviceId) {
   try {
+    // deviceId vem da conexão WebSocket (ws.deviceId)
+    if (!deviceId) {
+      console.warn('⚠️ deviceId não definido, ignorando frame CAN');
+      return;
+    }
     // Validação básica
     if (!canFrame.canId || !Array.isArray(canFrame.data) || typeof canFrame.dlc !== 'number') {
       console.error('❌ Frame CAN inválido:', canFrame);
       return;
     }
 
-    // Busca o último documento do dispositivo
-    let vehicleData = await VehicleData.findOne({ deviceId }).sort({ timestamp: -1 });
+    // Tenta atualizar um documento existente
+    const result = await VehicleData.updateOne(
+      { deviceId },
+      {
+        $push: { canMessages: canFrame },
+        $set: { timestamp: new Date() }
+      }
+    );
 
-    if (vehicleData) {
-      // Adiciona o frame CAN ao array existente
-      vehicleData.canMessages.push(canFrame);
-      vehicleData.timestamp = new Date(); // Atualiza timestamp
-    } else {
-      // Cria um novo documento com o frame CAN
-      vehicleData = new VehicleData({
+    // Se nenhum documento foi atualizado, cria um novo
+    if (result.matchedCount === 0) {
+      const vehicleData = new VehicleData({
         deviceId,
-        canMessages: [canFrame]
+        canMessages: [canFrame],
+        timestamp: new Date()
       });
+      await vehicleData.save();
     }
-
-    await vehicleData.save();
-    console.log(`✅ Frame CAN adicionado ao deviceId: ${deviceId}`);
+    //console.log(`✅ Frame CAN adicionado ao deviceId: ${deviceId}`);
   } catch (error) {
     console.error('❌ Erro ao salvar frame CAN diretamente:', error);
   }
@@ -107,11 +112,18 @@ async function addData() {
  * - Salva os frames no banco de dados.
  * - Reenvia mensagens para outros clientes conectados.
  */
-async function handleWebSocketMessage(ws, message, clients ) {
+async function handleWebSocketMessage(ws, message, clients) {
+  let deviceId = null;
   try {
     const rawMessage = message.toString();
 
-    if (rawMessage.trim().startsWith('{') && rawMessage.trim().endsWith('}')) {
+    if (rawMessage === "ESP32 conectado ao WebSocket!") {
+      // Armazena o deviceId na própria conexão WebSocket
+      ws.deviceId = await addData();
+      return;
+    }
+
+    if (rawMessage.trim().startsWith('{') && rawMessage.trim().endsWith('}') && ws.deviceId) {
       const data = JSON.parse(rawMessage);
 
       if (typeof data !== 'object' || data === null) {
@@ -136,13 +148,13 @@ async function handleWebSocketMessage(ws, message, clients ) {
             decodedData = {
               type: 'decodedData',
               source: 'battery',
-               decoded: decoded.data
+              decoded: decoded.data
             };
           } else if (decoded.type === 'motorController') {
             decodedData = {
               type: 'decodedData',
               source: 'motorController',
-               decoded: decoded.data
+              decoded: decoded.data
             };
           }
 
@@ -160,7 +172,7 @@ async function handleWebSocketMessage(ws, message, clients ) {
         }
 
         // Salva frame CAN bruto no MongoDB
-        addCanDirectly(canFrame, deviceId);
+        addCanDirectly(canFrame, ws.deviceId);
       }
 
       // Reenvia para outros clientes
@@ -169,12 +181,8 @@ async function handleWebSocketMessage(ws, message, clients ) {
           client.send(JSON.stringify(data));
         }
       });
-    } else {
-      console.log('💬 Mensagem de texto recebida:', rawMessage);
-      if (rawMessage === "ESP32 conectado ao WebSocket!"){
-        deviceId = await addData();
-      }
     }
+
   } catch (error) {
     console.error('❌ Erro ao processar mensagem do ESP32:', error);
     console.error('Mensagem recebida:', message.toString());

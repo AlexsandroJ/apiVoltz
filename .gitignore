@@ -7,10 +7,6 @@ yarn-debug.log
 
 # Ambiente
 .env
-.env.local
-.env.development
-.env.test
-.env.production
 
 # Build
 dist/
