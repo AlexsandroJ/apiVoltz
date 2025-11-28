@@ -1,45 +1,38 @@
 
 const { app } = require('./app');
 const { connectDB } = require('./database/db');
-const { handleWebSocketMessage, addData } = require('./utils/handleWebSocketMessage');
+const { handleWebSocketMessage, addData, sendMessage } = require('./utils/handleWebSocketMessage');
 const http = require('http');
 const WebSocket = require('ws');
 const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const clients = new Set();
 
 wss.on('connection', async (ws, req) => {
 
-  if (ws.deviceId) {
-    console.log(`🔌 Esp conectado : ${req.socket.remoteAddress}`);
-  } else {
-    console.log('🔌 Dashboard conectado');
-  }
-
-  clients.add(ws);
-
-  ws.on('message', (message) => handleWebSocketMessage(ws, message, clients));
+  ws.on('message', (message) => {
+    handleWebSocketMessage(wss, ws, message, req );
+  });
 
   ws.on('close', () => {
     if (ws.deviceId) {
       console.log(`❌🔌 Esp Desconectado : ${ws.deviceId}`);
+      sendMessage(wss, ws,`❌🔌 ESP32 Desconectado ${ws.deviceId}`);
     } else {
-      console.log('❌🔌 Dashboard desconectado');
+      console.log('❌🔌 Dashboard Desconectado');
     }
-
-    clients.delete(ws);
   });
 
   ws.on('error', (error) => {
     if (ws.deviceId) {
       console.log(`❌🔌 Erro no Esp : ${ws.deviceId}`);
+      sendMessage(wss, ws,`❌🔌 ESP32 Desconectado ${ws.deviceId}`);
     } else {
       console.log('❌🔌 Erro no Dashboard');
     }
-    console.error('❌ Erro no WebSocket:', error);
-    clients.delete(ws);
+    console.error('❌ Erro no WebSocket:', error);    
   });
+
   ws.send(JSON.stringify({ message: 'Conectado ao servidor WebSocket' }));
 });
 
@@ -54,3 +47,4 @@ connectDB()
     console.error('❌ Erro ao iniciar o servidor:', err);
   });
 
+  

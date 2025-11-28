@@ -27,31 +27,6 @@ const vehicleDataSchema = new mongoose.Schema({
     index: true // Para consultas por tempo
   },
 
-  // === DADOS BRUTOS DA REDE CAN (para histórico e depuração) ===
-  canMessages: [{
-    timestamp: {
-      type: Date,
-      default: Date.now,
-      index: true // Para consultas por tempo
-    },
-    canId: {
-      type: String,
-      required: false,
-    },
-    data: [{
-      type: Number,
-      required: false
-    }],
-    dlc: {
-      type: Number,
-      required: false
-    },
-    rtr: {
-      type: Boolean,
-      default: false
-    }
-  }],
-
   // === DADOS INTERPRETADOS (para dashboard) ===
   // Velocidade (km/h)
   speed: {

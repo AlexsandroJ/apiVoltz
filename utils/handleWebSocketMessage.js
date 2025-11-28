@@ -10,61 +10,72 @@
  * @module WebSocketHandler
  * @author Alexsandro j Silva
  * @version 1.0.0
- * @since 2025-11-21
+ * @since 2027-11-21
  */
 
 const axios = require('axios');
 const { decodeCanFrame, } = require('../utils/canDecoder');
 const VehicleData = require('../models/canDataModels'); // Importe seu modelo
+const CanFrame = require('../models/canFrameModels');
+
 const uri = `${process.env.API_URL}`;
+const WebSocket = require('ws');
+
+function sendMessage(wss, ws, message) {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && client !== ws) {
+      client.send(JSON.stringify(message));
+    }
+  });
+}
+
+// Buffer global para armazenar frames CAN
+const canBuffer = [];
+
+// Limite do buffer (envia quando atingir este número)
+const BUFFER_LIMIT = 100;
 
 /**
- * Adiciona um frame CAN diretamente no MongoDB.
- * 
- * @async
- * @function addCanDirectly
- * @param {object} canFrame - Frame CAN a ser adicionado.
- * @param {number} canFrame.canId - ID do frame CAN.
- * @param {number[]} canFrame.data - Array de bytes do frame.
- * @param {number} canFrame.dlc - Data Length Code.
- * @param {boolean} canFrame.rtr - Remote Transmission Request.
- * @returns {Promise<void>}
- * @throws {Error} Se o frame for inválido ou ocorrer erro de banco de dados.
+ * Adiciona um frame CAN ao buffer
  */
-async function addCanDirectly(canFrame, deviceId) {
+function addBuffer(canFrame, deviceId) {
+  if (!deviceId) {
+    console.warn('⚠️ deviceId não definido, ignorando frame CAN');
+    return;
+  }
+
+  // Adiciona frame ao buffer com seu deviceId
+  canBuffer.push({ canFrame, deviceId });
+
+  // Verifica se o buffer atingiu o limite
+  if (canBuffer.length >= BUFFER_LIMIT) {
+    processBuffer(); // Processa todos os frames do buffer
+  }
+}
+
+
+async function processBuffer() {
+  const useInMemoryDB = process.env.DEV;
+
+  if (canBuffer.length === 0) return;
+
+  const framesToInsert = canBuffer.map(({ canFrame, deviceId }) => ({
+    deviceId,
+    ...canFrame,
+    timestamp: new Date()
+  }));
+
   try {
-    // deviceId vem da conexão WebSocket (ws.deviceId)
-    if (!deviceId) {
-      console.warn('⚠️ deviceId não definido, ignorando frame CAN');
-      return;
+    // so inserir em memoria se for o caso de Deploy
+    if (useInMemoryDB === 'false') {
+      // salva todos os frames de uma vez
+      await CanFrame.insertMany(framesToInsert);
     }
-    // Validação básica
-    if (!canFrame.canId || !Array.isArray(canFrame.data) || typeof canFrame.dlc !== 'number') {
-      console.error('❌ Frame CAN inválido:', canFrame);
-      return;
-    }
-
-    // Tenta atualizar um documento existente
-    const result = await VehicleData.updateOne(
-      { deviceId },
-      {
-        $push: { canMessages: canFrame },
-        $set: { timestamp: new Date() }
-      }
-    );
-
-    // Se nenhum documento foi atualizado, cria um novo
-    if (result.matchedCount === 0) {
-      const vehicleData = new VehicleData({
-        deviceId,
-        canMessages: [canFrame],
-        timestamp: new Date()
-      });
-      await vehicleData.save();
-    }
-    //console.log(`✅ Frame CAN adicionado ao deviceId: ${deviceId}`);
+    
+    canBuffer.length = 0; // ← Só limpa se der sucesso
   } catch (error) {
-    console.error('❌ Erro ao salvar frame CAN diretamente:', error);
+    console.error('❌ Erro ao inserir frames:', error);
+    // canBuffer permanece intacto para nova tentativa
   }
 }
 
@@ -100,11 +111,10 @@ async function addData() {
  * 
  * @async
  * @function handleWebSocketMessage
- * @param {WebSocket} ws - Conexão WebSocket do cliente.
+ * @param {WebSocket} ws - Conexão WebSocket do cliente (ESP32).
  * @param {Buffer} message - Mensagem recebida do cliente.
- * @param {Set<WebSocket>} clients - Conjunto de todas as conexões WebSocket ativas.
+ * @param {Set<WebSocket>} allClients - Conjunto de todos os clientes conectados (ex: dashboards).
  * @returns {Promise<void>}
- * @description
  * Esta função:
  * - Faz parse da mensagem JSON.
  * - Processa frames CAN recebidos.
@@ -112,18 +122,27 @@ async function addData() {
  * - Salva os frames no banco de dados.
  * - Reenvia mensagens para outros clientes conectados.
  */
-async function handleWebSocketMessage(ws, message, clients) {
-  let deviceId = null;
+async function handleWebSocketMessage(wss, ws, message, req) {
   try {
-    const rawMessage = message.toString();
 
-    if (rawMessage === "ESP32 conectado ao WebSocket!") {
-      // Armazena o deviceId na própria conexão WebSocket
-      ws.deviceId = await addData();
+    const raw = message.toString().trim();
+
+    // Primeira mensagem do ESP32: identificação
+    if (raw === "ESP32 Conectado ao WebSocket!") {
+      addData().then(deviceId => {
+        ws.deviceId = deviceId;
+        console.log(`🔌 ESP32 Conectado: ${deviceId} | IP: ${req.socket.remoteAddress}`);
+        // Notifica outros clientes (dashboards) sobre a nova conexão do ESP32
+        sendMessage(wss, ws, `🔌 ESP32 Conectado ${deviceId}`);
+      });
       return;
+    } else if (raw === "🔌 Dashboard Conectado ao WebSocket!") {
+      console.log(`🔌 Dashboard Conectado IP: ${req.socket.remoteAddress}`);
     }
 
-    if (rawMessage.trim().startsWith('{') && rawMessage.trim().endsWith('}') && ws.deviceId) {
+    const rawMessage = message.toString().trim(); // trim uma vez
+
+    if (rawMessage.startsWith('{') && rawMessage.endsWith('}') && ws.deviceId) {
       const data = JSON.parse(rawMessage);
 
       if (typeof data !== 'object' || data === null) {
@@ -140,47 +159,26 @@ async function handleWebSocketMessage(ws, message, clients) {
           rtr: data.extended || false
         };
 
+        // Adiciona ao buffer em vez de salvar imediatamente
+        addBuffer(canFrame, ws.deviceId);
+
+        // Cria o objeto para envio reaproveitando as propriedades anteriores
+        const messagePayload = {
+          ...canFrame,
+          type: "canFrame"
+        };
+        sendMessage(wss, ws, messagePayload);
         const decoded = decodeCanFrame(canFrame);
-        if (decoded) {
-          let decodedData;
+        const validTypes = ['battery', 'motorController'];
 
-          if (decoded.type === 'battery') {
-            decodedData = {
-              type: 'decodedData',
-              source: 'battery',
-              decoded: decoded.data
-            };
-          } else if (decoded.type === 'motorController') {
-            decodedData = {
-              type: 'decodedData',
-              source: 'motorController',
-              decoded: decoded.data
-            };
-          }
-
-          if (decodedData) {
-            // Envia dados decodificados para o frontend
-            ws.send(JSON.stringify(decodedData));
-
-            // Opcional: envia para todos os clientes conectados
-            clients.forEach((client) => {
-              if (client.readyState === WebSocket.OPEN && client !== ws) {
-                client.send(JSON.stringify(decodedData));
-              }
-            });
-          }
+        if (decoded && validTypes.includes(decoded.type)) {
+          const decodedData = {
+            type: decoded.type,
+            decoded: decoded.data
+          };
+          sendMessage(wss, ws, decodedData);
         }
-
-        // Salva frame CAN bruto no MongoDB
-        addCanDirectly(canFrame, ws.deviceId);
       }
-
-      // Reenvia para outros clientes
-      clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN && client !== ws) {
-          client.send(JSON.stringify(data));
-        }
-      });
     }
 
   } catch (error) {
@@ -190,5 +188,7 @@ async function handleWebSocketMessage(ws, message, clients) {
 }
 
 module.exports = {
-  handleWebSocketMessage
+  handleWebSocketMessage,
+  addData,
+  sendMessage,
 };

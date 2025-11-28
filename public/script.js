@@ -14,7 +14,8 @@ const tempMotor = document.getElementById('temp-motor');
 const tempBatt = document.getElementById('temp-batt');
 
 const themeToggle = document.getElementById('theme-toggle');
-const statusIndicator = document.getElementById('status-indicator');
+const statusIndicatorServer = document.getElementById('status-indicator-server');
+const statusIndicatorEsp = document.getElementById('status-indicator-esp');
 const canBody = document.querySelector('#can-body');
 
 // Adiciona evento ao botão
@@ -68,7 +69,32 @@ function updateCanTableFromApi(messages) {
   }
 }
 
-// Adicione esta função ao seu script
+// No seu script.js
+async function fetchDecodedCanData() {
+  try {
+    const response = await fetch('/api/decoded-can-data');
+    const decodedFrames = await response.json();
+
+    // Atualiza os elementos do DOM com os dados decodificados
+    for (const frame of decodedFrames) {
+      if (frame.source === 'battery') {
+        bmsCurrent.textContent = frame.decoded.current;
+        bmsVoltage.textContent = frame.decoded.voltage;
+        bmsSoc.textContent = frame.decoded.soc;
+        bmsSoH.textContent = frame.decoded.soh ;
+        bmsTemp.textContent = frame.decoded.temperature;
+      } else if (frame.source === 'motorController') {
+        rpm.textContent = frame.decoded.motorSpeedRpm;
+        torque.textContent = frame.decoded.motorTorque.toFixed(1);
+        tempMotor.textContent = frame.decoded.motorTemperature;
+        tempBatt.textContent = frame.decoded.controllerTemperature;
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao buscar dados decodificados:', error);
+  }
+}
+
 async function fetchRecentCanData() {
   try {
     const response = await fetch('/api/can-data'); // Últimos 50 frames
@@ -168,13 +194,26 @@ function connectWebSocket() {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('🔌 Front Conectado WebSocket do servidor');
-      statusIndicator?.classList.add('online');
-      
+      console.log('🔌 Dashboard Conectado WebSocket do servidor');
+      statusIndicatorServer?.classList.add('online');
+      ws.send("🔌 Dashboard Conectado ao WebSocket!");
     };
 
     ws.onmessage = (event) => {
       try {
+
+        if (event.data.includes("ESP32 Conectado")) {
+          statusIndicatorEsp?.classList.add('online');
+          console.log(event.data);
+          return;
+        }
+
+        if (event.data.includes("ESP32 Desconectado")) {
+          statusIndicatorEsp?.classList.remove('online');
+          console.log(event.data);
+          return;
+        }
+
         const data = JSON.parse(event.data);
 
         if (typeof data !== 'object' || data === null) {
@@ -182,37 +221,34 @@ function connectWebSocket() {
           return;
         }
 
-        //console.log('📩 Front Dados recebidos via WebSocket:', data);
+        //console.log('📩 Dashboard Dados recebidos via WebSocket:', data.type);
 
         // ✅ Processa dados decodificados recebidos do servidor
-        if (data.type === 'decodedData') {
-          if (data.source === 'battery') {
-            const { current, voltage, soc, soh, temperature } = data.decoded; // ✅ Acesse data.decoded
-            bmsCurrent.textContent = current !== undefined ? current : '--';
-            bmsVoltage.textContent = voltage !== undefined ? voltage : '--';
-            bmsSoc.textContent = soc !== undefined ? soc : '--';
-            bmsSoH.textContent = soh !== undefined ? soh : '--';
-            bmsTemp.textContent = temperature !== undefined ? temperature : '--';
+        if (data.type === 'battery') {
+          const { current, voltage, soc, soh, temperature } = data.decoded; // ✅ Acesse data.decoded
+          bmsCurrent.textContent = current !== undefined ? current : '--';
+          bmsVoltage.textContent = voltage !== undefined ? voltage : '--';
+          bmsSoc.textContent = soc !== undefined ? soc : '--';
+          bmsSoH.textContent = soh !== undefined ? soh : '--';
+          bmsTemp.textContent = temperature !== undefined ? temperature : '--';
 
-          } else if (data.source === 'motorController') {
-            const { motorSpeedRpm, motorTorque, motorTemperature, controllerTemperature } = data.decoded; // ✅ Acesse data.decoded
-            rpm.textContent = motorSpeedRpm !== undefined ? motorSpeedRpm : '--';
-            torque.textContent = motorTorque !== undefined ? motorTorque.toFixed(1) : '--';
-            tempMotor.textContent = motorTemperature !== undefined ? motorTemperature : '--';
-            tempBatt.textContent = controllerTemperature !== undefined ? controllerTemperature : '--';
-            if( motorSpeedRpm != 0){
-              console.log("🚴‍♂️ Moto em movimento. Atualizando mapa...");
-            }
+        } else if (data.type === 'motorController') {
+          const { motorSpeedRpm, motorTorque, motorTemperature, controllerTemperature } = data.decoded; // ✅ Acesse data.decoded
+          rpm.textContent = motorSpeedRpm !== undefined ? motorSpeedRpm : '--';
+          torque.textContent = motorTorque !== undefined ? motorTorque.toFixed(1) : '--';
+          tempMotor.textContent = motorTemperature !== undefined ? motorTemperature : '--';
+          tempBatt.textContent = controllerTemperature !== undefined ? controllerTemperature : '--';
+          if (motorSpeedRpm != 0) {
+            console.log("🚴‍♂️ Moto em movimento. Atualizando mapa...");
           }
-        }
+        } else if (data.type === 'canFrame') {
+          // ✅ Atualiza tabela CAN em tempo real com frames brutos recebidos
 
-        // ✅ Atualiza tabela CAN em tempo real com frames brutos recebidos
-        if (data.type === 'canFrame') {
           const tr = document.createElement('tr');
           tr.classList.add('highlight');
           tr.innerHTML = `
     <td>${formatTimestamp(new Date())}</td> <!-- Timestamp -->
-    <td>0x${data.id.toString(16).toUpperCase()}</td> <!-- ID -->
+    <td>0x${data.canId.toString(16).toUpperCase()}</td> <!-- ID -->
     <td>${Array.isArray(data.data) ? data.data.join(', ') : data.data}</td> <!-- Dados -->
   `;
           canBody.prepend(tr); // Adiciona no topo
@@ -231,13 +267,13 @@ function connectWebSocket() {
 
     ws.onclose = () => {
       console.log('🔌 WebSocket desconectado');
-      statusIndicator?.classList.remove('online');
+      statusIndicatorServer?.classList.remove('online');
       setTimeout(connectWebSocket, 3000);
     };
 
     ws.onerror = (error) => {
       console.error('❌ Erro no WebSocket:', error);
-      statusIndicator?.classList.remove('online');
+      statusIndicatorServer?.classList.remove('online');
     };
   } catch (error) {
     console.error('❌ Erro ao criar conexão WebSocket:', error);
@@ -248,11 +284,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSavedTheme();
   initMap();
   connectWebSocket();
-
   fetchRecentCanData(); // Opcional: carregar dados iniciais da API
 });
 
 themeToggle?.addEventListener('click', toggleTheme);
 
 // Opcional: atualizar dados CAN da API a cada 5 segundos
-//setInterval(fetchRecentCanData, 5000);
+setInterval(fetchRecentCanData,fetchDecodedCanData, 5000);
+

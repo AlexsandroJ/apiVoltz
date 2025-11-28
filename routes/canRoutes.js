@@ -6,6 +6,7 @@ const {
   getVehicleDataByDeviceId,
   addCanMessage,
   getRecentCanData,
+  getDecodedCanData,
   exportAllCanDataAsCsv
 } = require('../controllers/canController');
 
@@ -125,6 +126,8 @@ router.post('/can/:deviceId', addCanMessage);
  *                 $ref: '#/components/schemas/CanMessage'
  */
 router.get('/can-data', getRecentCanData);
+
+router.get('/decoded-can-data', getDecodedCanData);
 
 /**
  * @swagger
