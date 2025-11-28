@@ -15,7 +15,7 @@
 // Configurações
 // -----------------------------
 #define TESTMODE true
-#define DEBUGMODE true
+#define DEBUGMODE false
 
 // CAN
 #define CAN_TX_PIN 5

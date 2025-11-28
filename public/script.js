@@ -290,5 +290,5 @@ document.addEventListener('DOMContentLoaded', () => {
 themeToggle?.addEventListener('click', toggleTheme);
 
 // Opcional: atualizar dados CAN da API a cada 5 segundos
-setInterval(fetchRecentCanData, 5000);
-setInterval(fetchDecodedCanData, 5000);
+setInterval(fetchRecentCanData, 500);
+setInterval(fetchDecodedCanData, 500);
