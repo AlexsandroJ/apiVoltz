@@ -197,24 +197,31 @@ exports.getRecentCanData = async (req, res) => {
 exports.getDecodedCanData = async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    //const { deviceId } = req.params;
-
+    
     // Busca os frames mais recentes
-    //const query = deviceId ? { deviceId } : {};
     const frames = await CanFrame
       .find()
       .sort({ timestamp: -1 })
       .limit(limit)
       .lean();
 
-    // Decodifica cada frame
+    // Decodifica cada frame (com tratamento de erro)
     const decodedFrames = frames.map(frame => {
-      const decoded = decodeCanFrame(frame);
-      return {
-        ...frame,
-        decoded: decoded ? decoded.data : null,
-        source: decoded ? decoded.type : 'unknown'
-      };
+      try {
+        const decoded = decodeCanFrame(frame);
+        return {
+          ...frame,
+          decoded: decoded ? decoded.data : null,
+          source: decoded ? decoded.type : 'unknown'
+        };
+      } catch (decodeError) {
+        console.warn(`Erro ao decodificar frame ${frame._id}:`, decodeError.message);
+        return {
+          ...frame,
+          decoded: null,
+          source: 'decoding_error'
+        };
+      }
     });
 
     res.json(decodedFrames);
