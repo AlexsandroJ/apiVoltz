@@ -80,7 +80,7 @@ async function fetchDecodedCanData() {
       if (frame.source === 'battery') {
         // Aplicação do .toFixed(2) para os valores da bateria
         bmsCurrent.textContent = frame.decoded.current.toFixed(2);
-        bmsVoltage.textContent = frame.decoded.voltage.toFixed(2);
+        bmsVoltage.textContent = frame.decoded.voltage.toFixed(3);
         bmsSoc.textContent = frame.decoded.soc;
         bmsSoH.textContent = frame.decoded.soh;
         bmsTemp.textContent = frame.decoded.temperature;
@@ -229,8 +229,8 @@ function connectWebSocket() {
         // ✅ Processa dados decodificados recebidos do servidor
         if (data.type === 'battery') {
           const { current, voltage, soc, soh, temperature } = data.decoded; // ✅ Acesse data.decoded
-          bmsCurrent.textContent = current !== undefined ? current : '--';
-          bmsVoltage.textContent = voltage !== undefined ? voltage : '--';
+          bmsCurrent.textContent = current.toFixed(2) !== undefined ? current.toFixed(2) : '--';
+          bmsVoltage.textContent = voltage.toFixed(2) !== undefined ? voltage.toFixed(2) : '--';
           bmsSoc.textContent = soc !== undefined ? soc : '--';
           bmsSoH.textContent = soh !== undefined ? soh : '--';
           bmsTemp.textContent = temperature !== undefined ? temperature : '--';
@@ -238,7 +238,7 @@ function connectWebSocket() {
         } else if (data.type === 'motorController') {
           const { motorSpeedRpm, motorTorque, motorTemperature, controllerTemperature } = data.decoded; // ✅ Acesse data.decoded
           rpm.textContent = motorSpeedRpm !== undefined ? motorSpeedRpm : '--';
-          torque.textContent = motorTorque !== undefined ? motorTorque.toFixed(1) : '--';
+          torque.textContent = motorTorque !== undefined ? motorTorque : '--';
           tempMotor.textContent = motorTemperature !== undefined ? motorTemperature : '--';
           tempBatt.textContent = controllerTemperature !== undefined ? controllerTemperature : '--';
           if (motorSpeedRpm != 0) {
@@ -255,7 +255,7 @@ function connectWebSocket() {
     <td>${Array.isArray(data.data) ? data.data.join(', ') : data.data}</td> <!-- Dados -->
   `;
           canBody.prepend(tr); // Adiciona no topo
-          setTimeout(() => tr.classList.remove('highlight'), 500);
+          //setTimeout(() => tr.classList.remove('highlight'), 1000);
 
           // Remove linhas antigas para não sobrecarregar a tabela
           if (canBody.children.length > 20) {
@@ -293,5 +293,5 @@ document.addEventListener('DOMContentLoaded', () => {
 themeToggle?.addEventListener('click', toggleTheme);
 
 // Opcional: atualizar dados CAN da API a cada 5 segundos
-setInterval(fetchRecentCanData, 500);
-setInterval(fetchDecodedCanData, 500);
+// setInterval(fetchRecentCanData, 500);
+//setInterval(fetchDecodedCanData, 500);
