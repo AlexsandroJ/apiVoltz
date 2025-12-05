@@ -15,8 +15,8 @@ function decodeBatteryData(data) {
   }
 
   return {
-    current: Math.round(((data[2] * 256 + data[3]) * 0.1)),
-    voltage: Math.round(((data[0] * 256 + data[1]) * 0.1)),
+    current: (data[2] * 256 + data[3]) * 0.1,
+    voltage: (data[0] * 256 + data[1]) * 0.1,
     soc: data[6],
     soh: data[7],
     temperature: data[4]
@@ -34,8 +34,8 @@ function decodeMotorControllerData(data) {
   }
 
   return {
-    motorSpeedRpm: Math.round(data[0] * 256 + data[1]),
-    motorTorque: Math.round((data[2] * 256 + data[3]) * 0.1),
+    motorSpeedRpm: data[0] * 256 + data[1],
+    motorTorque: (data[2] * 256 + data[3]) * 0.1,
     motorTemperature: data[7] - 40,
     controllerTemperature: data[6] - 40
   };

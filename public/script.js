@@ -78,14 +78,17 @@ async function fetchDecodedCanData() {
     // Atualiza os elementos do DOM com os dados decodificados
     for (const frame of decodedFrames) {
       if (frame.source === 'battery') {
-        bmsCurrent.textContent = frame.decoded.current;
-        bmsVoltage.textContent = frame.decoded.voltage;
+        // Aplicação do .toFixed(2) para os valores da bateria
+        bmsCurrent.textContent = frame.decoded.current.toFixed(2);
+        bmsVoltage.textContent = frame.decoded.voltage.toFixed(2);
         bmsSoc.textContent = frame.decoded.soc;
-        bmsSoH.textContent = frame.decoded.soh ;
+        bmsSoH.textContent = frame.decoded.soh;
         bmsTemp.textContent = frame.decoded.temperature;
+
       } else if (frame.source === 'motorController') {
+        // Aplicação do .toFixed(2) para os valores do motor
         rpm.textContent = frame.decoded.motorSpeedRpm;
-        torque.textContent = frame.decoded.motorTorque.toFixed(1);
+        torque.textContent = frame.decoded.motorTorque;
         tempMotor.textContent = frame.decoded.motorTemperature;
         tempBatt.textContent = frame.decoded.controllerTemperature;
       }
