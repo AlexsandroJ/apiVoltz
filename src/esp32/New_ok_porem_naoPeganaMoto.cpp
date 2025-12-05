@@ -93,7 +93,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
       break;
     case WStype_CONNECTED:
       logMessage("[WSc] Connected to url: %s", (char *)payload);
-      webSocket.sendTXT("ESP32 conectado ao WebSocket!");
+      webSocket.sendTXT("ESP32 Conectado ao WebSocket!");
       break;
     case WStype_ERROR:
       logMessage("[WSc] Error: %s", (char *)payload);
