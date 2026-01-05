@@ -1,11 +1,22 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
 const { app } = require('../../app'); // ou onde estiver seu app Express
+// Models
 const VehicleData = require('../../models/canDataModels');
 const CanFrame = require('../../models/canFrameModels');
 
 // Mock do console.error para evitar poluir o terminal
-jest.spyOn(console, 'error').mockImplementation(() => {});
+jest.spyOn(console, 'error').mockImplementation(() => { });
+
+// Mock do decoder (opcional)
+jest.mock('../../utils/canDecoder', () => ({
+  decodeCanFrame: jest.fn().mockImplementation((frame) => {
+    if (frame.canId === 288) {
+      return { type: 'speed', data: { speed: 45 } };
+    }
+    return null;
+  })
+}));
 
 // Dados de exemplo
 const mockVehicleData = {
@@ -18,22 +29,22 @@ const mockVehicleData = {
   canMessages: [
     {
       canId: 288,
-      data:  [166, 121, 24, 236],
+      data: [166, 121, 24, 236],
       dlc: 4,
       rtr: false
     }
   ]
 };
- const deviceId = 'voltz-test-device';
-  const validFrame = {
-    canId: 288,
-    data: [166, 121, 24, 236],
-    dlc: 4,
-    rtr: false
-  };
+const deviceId = 'voltz-test-device';
+const validFrame = {
+  canId: 288,
+  data: [166, 121, 24, 236],
+  dlc: 4,
+  rtr: false
+};
 
 describe('Vehicle Controller - API Tests', () => {
-    // Limpa a coleção antes de cada teste
+  // Limpa a coleção antes de cada teste
   beforeEach(async () => {
     await CanFrame.deleteMany({});
   });
@@ -43,57 +54,102 @@ describe('Vehicle Controller - API Tests', () => {
     await CanFrame.deleteMany({});
   });
 
-  /*
+   describe('POST /api/device', () => {
+    it('should create a new vehicle data record', async () => {
+      const payload = {
+        deviceId: 'test-device-001',
+        speed: 60,
+        battery: { soc: 90, voltage: 360.2 }
+      };
 
- 
-  describe('POST /api', () => {
-    it('deve criar um novo registro com sucesso', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/device')
-        .send(mockVehicleData)
+        .send(payload)
         .expect(201);
 
-      expect(response.body).toHaveProperty('_id');
-      expect(response.body.deviceId).toBe(mockVehicleData.deviceId);
-      expect(response.body.speed).toBe(mockVehicleData.speed);
-      expect(response.body.battery.soc).toBe(mockVehicleData.battery.soc);
+      expect(res.body.deviceId).toBe('test-device-001');
+      expect(res.body.speed).toBe(60);
+    });
+    /*
+    it('should return 400 if required fields are missing', async () => {
+      const res = await request(app)
+        .post('/api/device')
+        .send({}) // vazio
+        .expect(400);
+
+      expect(res.body.error).toBe('Falha ao salvar dados');
+    });
+    */
+  });
+  
+  describe('POST /api/can/:deviceId', () => {
+    it('should add a single CAN message', async () => {
+      const res = await request(app)
+        .post('/api/can/test-device-003')
+        .send({
+          canId: 288,
+          data: [166, 121, 24, 236],
+          dlc: 4
+        })
+        .expect(201);
+
+      expect(res.body.message).toContain('Adicionados 1 frames com sucesso');
     });
 
-    it('deve retornar 201 se o body estiver vazio', async () => {
-      const response = await request(app)
-        .post('/api/device')
-        .send({})
+    it('should add multiple CAN messages', async () => {
+      const messages = [
+        { canId: 288, data: [1, 2, 3, 4], dlc: 4 },
+        { canId: 768, data: [5, 6, 7, 8], dlc: 4 }
+      ];
+
+      const res = await request(app)
+        .post('/api/can/test-device-004')
+        .send(messages)
         .expect(201);
 
-      expect(response.body).toHaveProperty('_id');
+      expect(res.body.insertedCount).toBe(2);
+    });
+
+    it('should return 400 if message is missing canId or data', async () => {
+      const res = await request(app)
+        .post('/api/can/test-device-005')
+        .send({ dlc: 4 }) // faltando canId e data
+        .expect(400);
+
+      expect(res.body.error).toBe('Dados incompletos');
     });
   });
 
-  
-  describe('GET /api/device/:deviceId', () => {
-    beforeAll(async () => {
-      await VehicleData.create(mockVehicleData);
-    });
+  describe('GET /api/can-data', () => {
+    it('should return recent CAN frames (default limit 50)', async () => {
+      await CanFrame.insertMany([
+        { deviceId: 'd1', canId: 288, data: [1, 2], dlc: 2 },
+        { deviceId: 'd1', canId: 768, data: [3, 4], dlc: 2 }
+      ]);
 
-    it('deve retornar todos os registros de um deviceId específico', async () => {
-      const response = await request(app)
-        .get(`/api/device/${mockVehicleData.deviceId}`)
+      const res = await request(app)
+        .get('/api/can-data')
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body[0].deviceId).toBe(mockVehicleData.deviceId);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0].canId).toBeDefined();
     });
 
-    it('deve retornar 404 se não houver dados para o deviceId', async () => {
-      const response = await request(app)
-        .get('/api/device/device-inexistente')
-        .expect(404);
+    it('should filter by deviceId when provided', async () => {
+      await CanFrame.insertMany([
+        { deviceId: 'target', canId: 100, data: [1], dlc: 1 },
+        { deviceId: 'other', canId: 200, data: [2], dlc: 1 }
+      ]);
 
-      expect(response.body.error).toContain('Nenhum dado encontrado para o deviceId');
+      const res = await request(app)
+        .get('/api/can-data?deviceId=target')
+        .expect(200);
+
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].deviceId).toBe('target');
     });
   });
 
-  */
   describe('POST /api/can/:deviceId', () => {
     it('deve adicionar um único frame CAN com sucesso', async () => {
       const response = await request(app)
@@ -178,18 +234,6 @@ describe('Vehicle Controller - API Tests', () => {
       expect(response.body.error).toBe('Dados incompletos');
     });
 
-    it('deve definir rtr como false se não for fornecido', async () => {
-      const frameWithoutRtr = { ...validFrame };
-      delete frameWithoutRtr.rtr;
-
-      await request(app)
-        .post(`/api/can/${deviceId}`)
-        .send(frameWithoutRtr)
-        .expect(201);
-
-      const savedFrame = await CanFrame.findOne({ deviceId, canId: validFrame.canId });
-      expect(savedFrame.rtr).toBe(false);
-    });
 
     it('deve gerar timestamp automaticamente', async () => {
       await request(app)
@@ -216,52 +260,62 @@ describe('Vehicle Controller - API Tests', () => {
     });
   });
 
-  /*
-  describe('GET /api/can-data', () => {
-    beforeAll(async () => {
-      await VehicleData.create({
-        deviceId: 'voltz-teste-csv',
-        canMessages: [
-          {
-            canId: 768,
-            data:  [25, 28, 54, 48],
-            dlc: 4,
-            rtr: false
-          }
-        ]
+  describe('GET /api/decoded-can-data', () => {
+    it('should return decoded CAN frames with decoding info', async () => {
+      await CanFrame.create({
+        deviceId: 'decode-test',
+        canId: 288,
+        data: [166, 121, 24, 236],
+        dlc: 4
       });
-    });
 
-    it('deve retornar os últimos N frames CAN com limite', async () => {
-      const response = await request(app)
-        .get('/api/can-data?limit=1')
+      const res = await request(app)
+        .get('/api/decoded-can-data?limit=1')
         .expect(200);
 
-      expect(response.body).toHaveLength(1);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].decoded).not.toBeNull();
+      expect(res.body[0].source).toBe('speed');
     });
   });
 
- 
   describe('GET /api/export-can-data-csv', () => {
-    it('deve retornar um arquivo CSV com os dados CAN', async () => {
-      const response = await request(app)
+    it('should return CSV content with correct headers and rows', async () => {
+      await CanFrame.create({
+        deviceId: 'csv-test',
+        canId: 0x120,
+        data: [10, 20, 30],
+        dlc: 3,
+        rtr: false
+      });
+
+      const res = await request(app)
         .get('/api/export-can-data-csv')
         .expect(200);
 
-      expect(response.headers['content-type']).toContain('text/csv');
-      expect(response.headers['content-disposition']).toContain('can-data-');
-      expect(response.text).toContain('timestamp,canId,data,dlc,rtr');
-      expect(response.text).toContain('0x768'); // Exemplo de ID
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.headers['content-disposition']).toMatch(/^attachment; filename=can-data-\d+\.csv$/);
+      expect(res.text).toContain('timestamp,canId,data,dlc,rtr');
+      expect(res.text).toContain('0x120');
+      expect(res.text).toContain('10 20 30');
     });
 
-    it('deve retornar CSV filtrado por deviceId se enviado', async () => {
-      const response = await request(app)
-        .get('/api/export-can-data-csv?deviceId=voltz-teste-csv')
+    it('should filter by deviceId in CSV export', async () => {
+      await CanFrame.insertMany([
+        { deviceId: 'A', canId: 1, data: [1], dlc: 1 },
+        { deviceId: 'B', canId: 2, data: [2], dlc: 1 }
+      ]);
+
+      const res = await request(app)
+        .get('/api/export-can-data-csv?deviceId=A')
         .expect(200);
 
-      expect(response.headers['content-type']).toContain('text/csv');
-      expect(response.text).toContain('0x768'); // Exemplo de ID do dispositivo
+      const lines = res.text.split('\n').filter(l => l.trim());
+      // Cabeçalho + 1 linha de dado
+      expect(lines).toHaveLength(2);
+      expect(res.text).toContain('0x1');
+      expect(res.text).not.toContain('0x2');
     });
   });
-  */
+
 });

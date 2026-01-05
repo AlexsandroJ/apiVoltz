@@ -190,7 +190,6 @@ exports.getRecentCanData = async (req, res) => {
   }
 };
 
-
 /**
  * Retorna os últimos N frames CAN decodificados
  */
@@ -230,6 +229,7 @@ exports.getDecodedCanData = async (req, res) => {
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 };
+
 /**
  * Exporta todos os dados CAN do banco como CSV (com streaming para evitar memory leak).
  * 

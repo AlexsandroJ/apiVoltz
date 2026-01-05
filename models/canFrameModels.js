@@ -6,7 +6,7 @@ const canFrameSchema = new mongoose.Schema({
   canId: { type: Number, required: true },
   data: [{ type: Number, required: true }],
   dlc: { type: Number, required: true },
-  rtr: { type: Boolean, default: false },
+  ide: { type: Boolean, default: false },
   timestamp: { type: Date, default: Date.now, index: true }
 });
 

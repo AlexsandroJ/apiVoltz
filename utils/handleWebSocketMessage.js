@@ -156,7 +156,7 @@ async function handleWebSocketMessage(wss, ws, message, req) {
           canId: data.id,
           data: data.data,
           dlc: data.dlc,
-          rtr: data.extended || false
+          ide: data.extended || false
         };
 
         // Adiciona ao buffer em vez de salvar imediatamente

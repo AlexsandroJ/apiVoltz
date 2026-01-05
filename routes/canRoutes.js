@@ -127,6 +127,65 @@ router.post('/can/:deviceId', addCanMessage);
  */
 router.get('/can-data', getRecentCanData);
 
+/**
+ * @swagger
+ * /decoded-can-data:
+ *   get:
+ *     summary: Retorna os últimos N frames CAN decodificados
+ *     tags: [Vehicle Data]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Número máximo de frames decodificados a retornar
+ *     responses:
+ *       200:
+ *         description: Lista de frames CAN com dados decodificados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   _id:
+ *                     type: string
+ *                     example: "65f1a2b3c4d5e6f789012345"
+ *                   deviceId:
+ *                     type: string
+ *                     example: "voltz-20250121-143022"
+ *                   canId:
+ *                     type: integer
+ *                     example: 288
+ *                   data:
+ *                     type: array
+ *                     items:
+ *                       type: integer
+ *                     example: [166, 121, 24, 236]
+ *                   dlc:
+ *                     type: integer
+ *                     example: 4
+ *                   rtr:
+ *                     type: boolean
+ *                     example: false
+ *                   timestamp:
+ *                     type: string
+ *                     format: date-time
+ *                     example: "2025-01-21T14:30:22.000Z"
+ *                   decoded:
+ *                     type: object
+ *                     nullable: true
+ *                     example: { "speed": 45 }
+ *                   source:
+ *                     type: string
+ *                     example: "speed"
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.get('/decoded-can-data', getDecodedCanData);
 
 /**
