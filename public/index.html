@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Voltz</title>
+  <!-- 
+  <link rel="icon" type="image/png" href="logo.png">
+   -->
+  <link rel="stylesheet" href="style.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+
+<body class="dark-theme">
+  <div class="container">
+    <header>
+      <h1>⚡ Voltz - Dashboard</h1>
+      <p class="subtitle">Monitoramento em Tempo Real</p>
+      <!-- 
+      <p class="subtitle">Server</p> 
+      -->
+      <span class="status-indicator" id="status-indicator-server"></span>
+      <!--
+      
+      <p class="subtitle">Esp</p>
+      <span class="status-indicator" id="status-indicator-esp"></span>
+      -->
+      <button id="theme-toggle" title="Alternar tema">☀️</button>
+    </header>
+
+    <!-- Área de Visualização de Dados -->
+    <div class="data-panel">
+
+      <div class="data-card">
+        <h2>RPM</h2>
+        <div class="value" id="rpm">--</div>
+        <div class="unit">rpm</div>
+      </div>
+
+      <div class="data-card">
+        <h2>Torque</h2>
+        <div class="value" id="torque">--</div>
+        <div class="unit">Nm</div>
+      </div>
+
+      <div class="data-card">
+        <h2>🌡️ Temp. Motor</h2>
+        <div class="value" id="temp-motor">--</div>
+        <div class="unit">°C</div>
+      </div>
+
+      <div class="data-card">
+        <h2>🌡️​ Temp. Controlador</h2>
+        <div class="value" id="temp-batt">--</div>
+        <div class="unit">°C</div>
+      </div>
+
+      <div class="data-card">
+        <h2> BMS Voltage</h2>
+        <div class="value" id="bms-voltage">--</div>
+        <div class="unit">V</div>
+      </div>
+
+      <div class="data-card">
+        <h2>BMS Current</h2>
+        <div class="value" id="bms-current">--</div>
+        <div class="unit">A</div>
+      </div>
+      <div class="data-card">
+        <h2>BMS SoC</h2>
+        <div class="value" id="bms-soc">--</div>
+        <div class="unit">%</div>
+      </div>
+
+      <div class="data-card">
+        <h2>BMS SoH</h2>
+        <div class="value" id="bms-soh">--</div>
+        <div class="unit">%</div>
+      </div>
+      <div class="data-card">
+        <h2>🌡️ BMS</h2>
+        <div class="value" id="bms-temp">--</div>
+        <div class="unit">°C</div>
+      </div>
+    </div>
+
+
+    <!-- Área do Mapa -->
+    <div class="map-section">
+      <h2>📍 Localização da Moto</h2>
+      <div id="map"></div>
+    </div>
+
+    <!-- Área de Log CAN -->
+    <div class="can-section">
+      <h2 class="can-header">
+        📡 Rede CAN - Mensagens Recebidas
+        <button id="download-can-data">📥</button>
+      </h2>
+      <div class="can-table-container">
+
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>ID</th>
+              <th>Dados (Hex)</th>
+
+            </tr>
+          </thead>
+          <tbody id="can-body">
+            
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      &copy; 2025 Sistema de Monitoramento Voltz | Dados da rede CAN via API
+    </footer>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Script principal -->
+  <script src="script.js"></script>
+</body>
+
+</html>
