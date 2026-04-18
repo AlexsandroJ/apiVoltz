@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const canFrameSchema = new mongoose.Schema({
-  deviceId: { type: String, required: true, index: true },
+  deviceId: { type: String, required: false, index: true },
   canId: { type: Number, required: true },
   data: [{ type: Number, required: true }],
   dlc: { type: Number, required: true },

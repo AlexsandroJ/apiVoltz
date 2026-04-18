@@ -7,7 +7,10 @@ const WebSocket = require('ws');
 const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+const { connectMQTT } = require('./mqtt/mqttClient');
 
+
+/*
 wss.on('connection', async (ws, req) => {
 
   ws.on('message', (message) => {
@@ -35,16 +38,18 @@ wss.on('connection', async (ws, req) => {
 
   ws.send(JSON.stringify({ message: 'Conectado ao servidor WebSocket' }));
 });
+*/
 
 connectDB()
   .then(() => {
     server.listen(PORT, async () => {
       console.log(`🟢 Servidor rodando na porta ${PORT}`);
-      console.log(`WebSocket disponível em ws://localhost:${PORT}`);
+      //console.log(`WebSocket disponível em ws://localhost:${PORT}`);
     });
   })
   .catch((err) => {
     console.error('❌ Erro ao iniciar o servidor:', err);
   });
 
-  
+  // Iniciar cliente MQTT
+connectMQTT();

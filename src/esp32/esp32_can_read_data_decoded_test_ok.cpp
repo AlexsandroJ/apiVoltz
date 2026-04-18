@@ -6,7 +6,8 @@
 #include <freertos/task.h>
 #include <freertos/queue.h>
 #include <string.h> // Adicione esta linha no início do seu arquivo se ainda não estiver lá
-#include "../config/constants.h"
+#include "../../config/constants.h"
+
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---
 // ------------------------------------------------------------------

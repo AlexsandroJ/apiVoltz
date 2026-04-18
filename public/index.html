@@ -111,12 +111,19 @@
             </tr>
           </thead>
           <tbody id="can-body">
-            
+
           </tbody>
         </table>
       </div>
     </div>
+    <button id="start-gps-btn" class="btn">
+      📍 Iniciar GPS do Celular
+    </button>
+    <div id="gps-status" style="margin-top: 8px; font-size: 0.9em; color: #666;"></div>
 
+    <button onclick="enviarLocalizacaoParaServidor('esp32-moto-001')">
+  Enviar Minha Localização
+</button>
     <footer>
       &copy; 2025 Sistema de Monitoramento Voltz | Dados da rede CAN via API
     </footer>

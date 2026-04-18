@@ -21,12 +21,6 @@ const canBody = document.querySelector('#can-body');
 // Adiciona evento ao botão
 document.getElementById('download-can-data')?.addEventListener('click', downloadCanData);
 
-// Nome dos IDs CAN conhecidos
-const canIdNames = {
-  '0x120': 'BMS Status',
-  '0x300': 'Motor Status',
-};
-
 // Dados atuais
 const liveData = {
   rpm: '--',
@@ -161,6 +155,178 @@ function updateMapPosition(lat, lon) {
   }
   liveData.lastCoords = [lat, lon];
 }
+
+// === Controle de GPS do celular ===
+const startGpsBtn = document.getElementById('start-gps-btn');
+const gpsStatusEl = document.getElementById('gps-status');
+let watchId = null; // ID do watcher de geolocalização contínua
+const DEVICE_ID = 'esp32-moto-001'; // ⚠️ Ajuste conforme seu deviceId real
+
+async function sendLocationToServer(lat, lon, accuracy) {
+  try {
+    const response = await fetch(`/api/device/${DEVICE_ID}/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: lat,
+        longitude: lon,
+        accuracy: accuracy,
+        timestamp: Date.now()
+      })
+    });
+
+    if (response.ok) {
+      console.log('✅ Localização enviada com sucesso');
+      updateMapPosition(lat, lon); // Atualiza o marcador no mapa
+      gpsStatusEl.textContent = `📍 Enviado: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    } else {
+      const errorText = await response.text();
+      console.error('❌ Falha ao enviar localização:', errorText);
+      gpsStatusEl.textContent = '❌ Erro ao enviar GPS';
+    }
+  } catch (error) {
+    console.error('🌐 Erro de rede ao enviar GPS:', error);
+    gpsStatusEl.textContent = '🌐 Sem conexão com o servidor';
+  }
+}
+
+function handleGpsSuccess(position) {
+  const { latitude, longitude, accuracy } = position.coords;
+  gpsStatusEl.textContent = `📡 Recebido: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (±${accuracy}m)`;
+  sendLocationToServer(latitude, longitude, accuracy);
+}
+
+function handleGpsError(error) {
+  let message = '⚠️ GPS não disponível';
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      message = '❌ Permissão de localização negada';
+      break;
+    case error.POSITION_UNAVAILABLE:
+      message = '❌ Localização indisponível';
+      break;
+    case error.TIMEOUT:
+      message = '⏱️ Tempo limite excedido';
+      break;
+  }
+  console.error('Erro de geolocalização:', message);
+  gpsStatusEl.textContent = message;
+  stopGpsTracking(); // Para tentativas futuras
+}
+
+function startGpsTracking() {
+  if (!navigator.geolocation) {
+    gpsStatusEl.textContent = '❌ Geolocalização não suportada';
+    alert('Seu navegador não suporta geolocalização. Use um navegador moderno para acessar esta funcionalidade.');
+    return;
+  }
+
+  // Desabilita o botão e muda o texto
+  startGpsBtn.disabled = true;
+  startGpsBtn.textContent = '📍 Parar GPS';
+
+  gpsStatusEl.textContent = 'Aguardando localização...';
+
+  // Solicita atualizações contínuas (não só uma vez)
+  watchId = navigator.geolocation.watchPosition(
+    handleGpsSuccess,
+    handleGpsError,
+    {
+      enableHighAccuracy: true, // Usa GPS em vez de Wi-Fi/celular se possível
+      timeout: 10000,           // 10 segundos para resposta
+      maximumAge: 30000         // Aceita posição com até 30s de idade
+    }
+  );
+
+  
+}
+
+function stopGpsTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  startGpsBtn.disabled = false;
+  startGpsBtn.textContent = '📍 Iniciar GPS do Celular';
+  gpsStatusEl.textContent = 'GPS parado';
+}
+
+// Alterna entre iniciar e parar
+startGpsBtn?.addEventListener('click', () => {
+  if (watchId === null) {
+    startGpsTracking();
+  } else {
+    stopGpsTracking();
+  }
+});
+
+
+
+
+function enviarLocalizacaoParaServidor(deviceId) {
+  if (!navigator.geolocation) {
+    alert("⚠️ Seu navegador não suporta geolocalização.");
+    return;
+  }
+
+  // Opções de precisão e tempo limite
+  const opcoes = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 30000
+  };
+
+  navigator.geolocation.getCurrentPosition(
+    // ✅ Sucesso
+    (posicao) => {
+      const { latitude, longitude, accuracy } = posicao.coords;
+      console.log("📍 Localização obtida:", latitude, longitude);
+
+      // Envia para sua API
+      fetch(`http://localhost:3000/api/device/${deviceId}/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          accuracy,
+          timestamp: Date.now()
+        })
+      })
+      .then(res => {
+        if (res.ok) {
+          console.log("✅ Localização enviada com sucesso!");
+        } else {
+          console.error("❌ Erro ao enviar para a API");
+        }
+      })
+      .catch(err => {
+        console.error("Erro de rede:", err);
+      });
+    },
+    // ❌ Erro
+    (erro) => {
+      let mensagem = "";
+      switch(erro.code) {
+        case erro.PERMISSION_DENIED:
+          mensagem = "Você negou o acesso à localização. Por favor, permita nas configurações do site.";
+          break;
+        case erro.POSITION_UNAVAILABLE:
+          mensagem = "Não foi possível obter sua localização.";
+          break;
+        case erro.TIMEOUT:
+          mensagem = "Tempo limite excedido. Tente novamente.";
+          break;
+        default:
+          mensagem = "Erro desconhecido: " + erro.message;
+      }
+      console.error("❌", mensagem);
+      alert("Erro de geolocalização:\n" + mensagem);
+    },
+    opcoes
+  );
+}
+
 
 // Alternar tema
 function toggleTheme() {

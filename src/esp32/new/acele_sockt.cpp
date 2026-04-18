@@ -12,7 +12,8 @@
 
 #include <MPU6050_light.h>
 #include <Wire.h>
-#include "../config/constants.h"
+#include "../../config/constants.h"
+
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---
 // ------------------------------------------------------------------

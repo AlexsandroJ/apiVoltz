@@ -71,20 +71,20 @@ exports.createVehicleData = async (req, res) => {
  * GET /api/device/voltz-20250121-143022
  * Response: [{ "_id": "...", "timestamp": "...", ... }]
  */
-exports.getVehicleDataByDeviceId = async (req, res) => {
+exports.getVehicleData = async (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
-  const { deviceId } = req.params;
+  //const { deviceId } = req.params;
 
   try {
     const data = await VehicleData
-      .find({ deviceId: deviceId })
+      .find({})
       .sort({ timestamp: -1 })
       .lean() // reduzir o uso de memória
       .limit(limit)
       .exec();
 
     if (data.length === 0) {
-      return res.status(404).json({ error: `Nenhum dado encontrado para o deviceId: ${deviceId}` });
+      return res.status(404).json({ error: `Nenhum dado encontrado para o` });
     }
 
     res.json(data);
@@ -114,7 +114,7 @@ exports.getVehicleDataByDeviceId = async (req, res) => {
  */
 exports.addCanMessage = async (req, res) => {
   try {
-    const { deviceId } = req.params;
+    //const { deviceId } = req.params;
     const canMessages = Array.isArray(req.body) ? req.body : [req.body];
 
     // Validação básica
@@ -125,17 +125,32 @@ exports.addCanMessage = async (req, res) => {
           message: 'Cada frame CAN deve conter canId e data'
         });
       }
+
+      const hexArray = msg.data.split(' '); // Transforma em ["09", "D8", ...]
+      const numericData = hexArray.map(hex => parseInt(hex, 16)); // Converte para [9, 216, 14, ...]
+      msg.data = numericData; // Adiciona o array numérico para facilitar consultas futuras
     }
 
-    // Prepara os documentos para inserção
+
     const framesToInsert = canMessages.map(msg => ({
-      deviceId,
+      
       canId: msg.canId,
       data: msg.data,
       dlc: msg.dlc,
-      rtr: msg.rtr || false,
-      timestamp: new Date()
+      ide: msg.ide || false,
+      timestamp: new Date(msg.ts)
     }));
+
+    framesToInsert.forEach(element => {
+      const decodedFrame = decodeCanFrame(element);
+
+      if (decodedFrame) {
+
+        processDecodedFrame(decodedFrame, element.timestamp);
+      }
+
+    });
+
     // Insere todos os frames de uma só vez
     const result = await CanFrame.insertMany(framesToInsert);
 
@@ -173,62 +188,27 @@ exports.addCanMessage = async (req, res) => {
  * ]
  */
 exports.getRecentCanData = async (req, res) => {
+  // Define o limite com trava de segurança
   const limit = Math.min(parseInt(req.query.limit) || 50, 1000);
-  const { deviceId } = req.query;
 
   try {
-    const query = deviceId ? { deviceId } : {};
+    // 1. Defina a query (vazia {} busca todos os registros)
+    const query = {};
+
+    // 2. Busca no banco
     const frames = await CanFrame
-      .find(query)
-      .sort({ timestamp: -1 })
+      .find(query)             // Agora a variável existe
+      .sort({ timestamp: -1 }) // Garante que os mais novos venham primeiro
       .limit(limit)
-      .lean();
+      .lean();                 // Melhora performance (retorna objeto puro JS)
 
     res.json(frames);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno' });
+    console.error('Erro ao buscar frames:', error);
+    res.status(500).json({ error: 'Erro interno ao buscar dados CAN' });
   }
 };
 
-/**
- * Retorna os últimos N frames CAN decodificados
- */
-exports.getDecodedCanData = async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    
-    // Busca os frames mais recentes
-    const frames = await CanFrame
-      .find()
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .lean();
-
-    // Decodifica cada frame (com tratamento de erro)
-    const decodedFrames = frames.map(frame => {
-      try {
-        const decoded = decodeCanFrame(frame);
-        return {
-          ...frame,
-          decoded: decoded ? decoded.data : null,
-          source: decoded ? decoded.type : 'unknown'
-        };
-      } catch (decodeError) {
-        console.warn(`Erro ao decodificar frame ${frame._id}:`, decodeError.message);
-        return {
-          ...frame,
-          decoded: null,
-          source: 'decoding_error'
-        };
-      }
-    });
-
-    res.json(decodedFrames);
-  } catch (error) {
-    console.error('Erro ao buscar frames decodificados:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-};
 
 /**
  * Exporta todos os dados CAN do banco como CSV (com streaming para evitar memory leak).
@@ -267,3 +247,181 @@ exports.exportAllCanDataAsCsv = async (req, res) => {
   }
   res.end();
 };
+
+/**
+ * Exporta todos os dados de VehicleData como CSV (com streaming)
+ */
+exports.exportVehicleDataAsCsv = async (req, res) => {
+  const { deviceId } = req.query;
+  const query = deviceId ? { deviceId } : {};
+
+  // Define cabeçalho do CSV
+  const headers = [
+    'timestamp',
+    'deviceId',
+    'speed',
+    'battery.soc',
+    'battery.soh',
+    'battery.voltage',
+    'battery.current',
+    'battery.temperature',
+    'motor.modo',
+    'motor.rpm',
+    'motor.torque',
+    'motor.motorTemp',
+    'motor.controlTemp',
+    'gpsAccuracy',
+    'location.coordinates'
+  ];
+
+  // Configura resposta CSV
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename=vehicle-data-${Date.now()}.csv`);
+  res.write(headers.join(',') + '\n');
+
+  // Usa cursor para streaming eficiente
+  const cursor = VehicleData
+    .find(query)
+    .sort({ timestamp: 1 })
+    .cursor();
+
+  for await (const doc of cursor) {
+    const row = [
+      `"${doc.timestamp?.toISOString() || ''}"`,
+      `"${doc.deviceId || ''}"`,
+      doc.speed ?? '',
+      doc.battery?.soc ?? '',
+      doc.battery?.soh ?? '',
+      doc.battery?.voltage ?? '',
+      doc.battery?.current ?? '',
+      doc.battery?.temperature ?? '',
+      doc.motor?.modo ?? '',
+      doc.motor?.rpm ?? '',
+      doc.motor?.torque ?? '',
+      doc.motor?.motorTemp ?? '',
+      doc.motor?.controlTemp ?? '',
+      doc.gpsAccuracy ?? '',
+      doc.location?.coordinates ? `"${doc.location.coordinates.join(',')}"` : ''
+    ].map(field => {
+      // Escapa aspas dentro dos campos (boa prática)
+      if (typeof field === 'string') {
+        return field.replace(/"/g, '""');
+      }
+      return field;
+    });
+
+    res.write(row.join(',') + '\n');
+  }
+
+  res.end();
+};
+
+exports.addLocationToLatestVehicleData = async (req, res) => {
+  const { latitude, longitude, accuracy } = req.body;
+
+  // Validação básica
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return res.status(400).json({ error: 'latitude e longitude são obrigatórios e devem ser números' });
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'Coordenadas fora do intervalo válido' });
+  }
+
+  try {
+    // 1. Busca o último registro de VehicleData
+    const lastRecord = await VehicleData.findOne().sort({ timestamp: -1 });
+
+    if (!lastRecord) {
+      return res.status(404).json({ error: 'Nenhum dado de veículo encontrado para atualizar' });
+    }
+
+    // 2. Cria um novo documento com base no último, adicionando localização
+    const newRecord = new VehicleData({
+      ...lastRecord.toObject(), // copia todos os campos
+      _id: undefined,          // força novo ID
+      createdAt: undefined,    // força novo createdAt
+      updatedAt: undefined,    // força novo updatedAt
+      location: {
+        type: 'Point',
+        coordinates: [longitude, latitude] // GeoJSON: [lon, lat]
+      },
+      gpsAccuracy: accuracy
+    });
+
+    // 3. Salva novo registro
+    const saved = await newRecord.save();
+
+    res.status(201).json(saved);
+
+  } catch (error) {
+    console.error('Erro ao adicionar localização:', error);
+    res.status(500).json({ error: 'Falha ao salvar localização' });
+  }
+};
+
+async function processDecodedFrame(decodedFrame, timestamp) {
+  try {
+
+    const lastValidLocation = await VehicleData.findOne({
+      'location.coordinates': { $exists: true, $ne: [], $size: 2 }
+    }).sort({ timestamp: -1 }).select('location').lean();
+
+    // 1. Busca o último registro completo
+    const lastRecord = await VehicleData.findOne({}).sort({ timestamp: -1 }).lean();
+
+    // 2. Define base: usa último registro ou objeto vazio
+    const base = lastRecord || {};
+
+    // 3. Mescla campos de forma segura
+    const newRecord = {
+      // Campos simples: só atualiza se vierem no frame
+
+      ...(decodedFrame.speed !== undefined && { speed: decodedFrame.speed }),
+      ...(decodedFrame.gpsAccuracy !== undefined && { gpsAccuracy: decodedFrame.gpsAccuracy }),
+
+      // Subdocumentos: mescla com o anterior
+      battery: {
+        ...(base.battery || {}),
+        ...(decodedFrame.battery || {})
+      },
+      motor: {
+        ...(base.motor || {}),
+        ...(decodedFrame.motor || {})
+      },
+
+      // ✅ Localização: só define se tiver nova OU herdar válida
+      ...(decodedFrame.location?.coordinates?.length === 2
+        ? {
+          location: {
+            type: 'Point',
+            coordinates: decodedFrame.location.coordinates
+          }
+        }
+        : lastValidLocation?.location
+          ? { location: lastValidLocation.location }
+          : {}),
+
+      timestamp: timestamp
+    };
+
+    // 4. Salva novo estado completo
+    const doc = new VehicleData(newRecord);
+    await doc.save();
+    //console.log('🆕 Novo registro salvo:', doc);
+
+  } catch (error) {
+    console.error('❌ Erro ao processar frame:', error);
+  }
+}
+
+// Busca o último registro com localização válida
+async function getLastValidLocation() {
+  return await VehicleData.findOne({
+    'location.coordinates': { $exists: true, $ne: [], $size: 2 },
+    'location.coordinates.0': { $type: 'number' },
+    'location.coordinates.1': { $type: 'number' }
+  })
+    .sort({ timestamp: -1 }) // mais recente primeiro
+    .select('location') // só os campos necessários
+    .lean();
+}

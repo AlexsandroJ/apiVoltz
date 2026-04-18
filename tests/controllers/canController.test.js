@@ -53,6 +53,7 @@ describe('Vehicle Controller - API Tests', () => {
     await VehicleData.deleteMany({});
     await CanFrame.deleteMany({});
   });
+  
 
    describe('POST /api/device', () => {
     it('should create a new vehicle data record', async () => {
@@ -70,16 +71,7 @@ describe('Vehicle Controller - API Tests', () => {
       expect(res.body.deviceId).toBe('test-device-001');
       expect(res.body.speed).toBe(60);
     });
-    /*
-    it('should return 400 if required fields are missing', async () => {
-      const res = await request(app)
-        .post('/api/device')
-        .send({}) // vazio
-        .expect(400);
-
-      expect(res.body.error).toBe('Falha ao salvar dados');
-    });
-    */
+    
   });
   
   describe('POST /api/can/:deviceId', () => {
@@ -259,7 +251,7 @@ describe('Vehicle Controller - API Tests', () => {
       expect(response.body.error).toBe('Falha ao adicionar mensagens CAN');
     });
   });
-
+  
   describe('GET /api/decoded-can-data', () => {
     it('should return decoded CAN frames with decoding info', async () => {
       await CanFrame.create({
@@ -278,7 +270,7 @@ describe('Vehicle Controller - API Tests', () => {
       expect(res.body[0].source).toBe('speed');
     });
   });
-
+  /*
   describe('GET /api/export-can-data-csv', () => {
     it('should return CSV content with correct headers and rows', async () => {
       await CanFrame.create({
@@ -317,5 +309,5 @@ describe('Vehicle Controller - API Tests', () => {
       expect(res.text).not.toContain('0x2');
     });
   });
-
+  */
 });

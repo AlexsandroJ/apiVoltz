@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <driver/twai.h>
-#include "../config/constants.h"
+#include "../../config/constants.h"
+
 
 // Configuração dos pinos CAN
 #define CAN_TX_PIN GPIO_NUM_5
@@ -8,10 +9,6 @@
 
 //======= CONFIGURAÇÕES CAN do TCC =======
 #define N_BATTERIES 1              // Number of batteries in the system
-#define BASE_BATTERY_ID 0x351      // Base ID for battery data
-#define BASE_BATTERY_ID_2 0x355    // Base ID for battery error data
-#define BASE_CONTROLLER_ID 0x3A1   // Base ID for controller data
-#define BASE_CONTROLLER_ID_2 0x3A2 // Base ID for controller error data
 
 // Creates a struct to store bateries medium frequency info
 struct batteryInfo {

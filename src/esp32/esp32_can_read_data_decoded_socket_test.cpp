@@ -6,7 +6,8 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 #include <string.h>
-#include "../config/constants.h"
+#include "../../config/constants.h"
+
 #define testMode true
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---

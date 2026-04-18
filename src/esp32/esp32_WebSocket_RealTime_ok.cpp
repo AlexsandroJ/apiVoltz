@@ -20,9 +20,6 @@ const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
 // Flags
 #define TESTMODE false
 #define DEBUGMODE false
-// IDs base (apenas para simulação)
-#define BASE_BATTERY_ID 0x120
-#define BASE_CONTROLLER_ID 0x300
 // Estrutura para armazenar frames CAN genéricos
 struct CanMessage {
   uint32_t id;

@@ -7,6 +7,7 @@ const vehicleDataSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
+    
     default: () => {
       const now = new Date();
       const year = now.getFullYear();
@@ -18,27 +19,24 @@ const vehicleDataSchema = new mongoose.Schema({
       const formatted = `${year}${month}${day}-${hour}${minute}${second}`;
       return `voltz-${formatted}`;
     }
+    
   },
 
   // Timestamp principal do evento
   timestamp: {
     type: Date,
-    default: Date.now,
-    index: true // Para consultas por tempo
   },
-
   // === DADOS INTERPRETADOS (para dashboard) ===
   // Velocidade (km/h)
   speed: {
     type: Number,
-    min: 0,
-    max: 200
+    default: 0
   },
 
   // Bateria
   battery: {
-    soc: { type: Number, min: 0, max: 100 }, // State of Charge (%)
-    soh: { type: Number, min: 0, max: 100 }, // State of Health (%)
+    soc: { type: Number }, // State of Charge (%)
+    soh: { type: Number }, // State of Health (%)
     voltage: { type: Number }, // Volts
     current: { type: Number }, // Amperes (negativo = carga)
     temperature: { type: Number } // °C
@@ -47,55 +45,28 @@ const vehicleDataSchema = new mongoose.Schema({
   // Motor
   motor: {
     rpm: { type: Number },
-    power: { type: Number }, // kW
+    torque: { type: Number }, // Nm
     motorTemp: { type: Number },
-    controlTemp: { type: Number }
+    controlTemp: { type: Number },
+    modo: { type: String }
   },
 
-  // Localização
-  location: {
-    type: {
-      type: String,
-      enum: ['Point'],
-      default: 'Point'
-    },
-    coordinates: {
-      type: [Number],
-      required: false,
-      default: null
-      // [longitude, latitude]
-    }
+ location: {
+    type: { type: String, enum: ['Point'] },
+    coordinates: { type: [Number] } // aceita qualquer array (ou ausente)
   },
 
-  // Autonomia
-  range: {
+  // Precisão do GPS (opcional, fora de location)
+  gpsAccuracy: {
     type: Number,
-    min: 0
+    default: 0
   },
+
 
 }, {
   timestamps: true, // createdAt, updatedAt
-  // Habilita geolocalização
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  
 });
 
-// Índice para geolocalização
-vehicleDataSchema.index({ location: '2dsphere' });
-
-// Índices para consultas rápidas
-vehicleDataSchema.index({ timestamp: -1 });
-vehicleDataSchema.index({ deviceId: 1, timestamp: -1 });
-
-// Virtual para facilitar no frontend
-vehicleDataSchema.virtual('gpsLocation').get(function () {
-  if (this.location?.coordinates) {
-    return {
-      lat: this.location.coordinates[1],
-      lon: this.location.coordinates[0]
-    };
-  }
-  return null;
-});
 
 module.exports = mongoose.model('VehicleData', vehicleDataSchema);

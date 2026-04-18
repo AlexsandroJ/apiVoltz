@@ -9,7 +9,8 @@
 #include <freertos/task.h>
 #include <string.h>
 #include <stdarg.h> // para logMessage
-#include "../config/constants.h"
+#include "../../config/constants.h"
+
 
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÃO DE PINOS E VELOCIDADE ---

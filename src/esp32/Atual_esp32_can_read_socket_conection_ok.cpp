@@ -20,7 +20,8 @@
 const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
 
 // IDs base (apenas para simulação, não decodificação)
-#include "../config/constants.h"
+#include "../../config/constants.h"
+
 
 // Estrutura para armazenar frames CAN genéricos
 struct CanMessage {

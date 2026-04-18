@@ -3,6 +3,7 @@
 #include <ESP32-TWAI-CAN.hpp> 
 #include <FS.h>           // Necessário para o sistema de arquivos
 #include <LittleFS.h>     // Necessário para o LittleFS
+#include "../../config/constants.h"
 
 // ------------------------------------------------------------------
 // 1. CONFIGURAÇÕES DE REDE

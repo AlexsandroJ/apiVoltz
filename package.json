@@ -6,7 +6,8 @@
   "scripts": {
     "start": "nodemon server.js",
     "dev": "nodemon server.js",
-    "test": "jest"
+    "test": "jest",
+    "test:mqtt": "jest tests/integration/mqttTelemetry.test.js"
   },
   "author": "alexsandroj",
   "license": "ISC",
@@ -18,6 +19,7 @@
     "express": "^5.1.0",
     "fs": "^0.0.1-security",
     "mongoose": "^8.18.0",
+    "mqtt": "^5.15.1",
     "path": "^0.12.7",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
