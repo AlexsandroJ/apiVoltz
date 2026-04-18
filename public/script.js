@@ -99,6 +99,7 @@ async function fetchDecodedCanData() {
 
         if (frame.location) { 
           locationGps.textContent = frame.location.coordinates;
+          updateMapPosition(frame.location.coordinates[1], frame.location.coordinates[0]);
         }
     }
   } catch (error) {
