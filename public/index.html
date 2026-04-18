@@ -15,6 +15,8 @@
 
 <body class="dark-theme">
   <div class="container">
+
+
     <header>
       <h1>⚡ Voltz - Dashboard</h1>
       <p class="subtitle">Monitoramento em Tempo Real</p>
@@ -32,6 +34,12 @@
 
     <!-- Área de Visualização de Dados -->
     <div class="data-panel">
+
+      <div class="data-card">
+        <h2>MODO</h2>
+        <div class="value" id="modo">--</div>
+        <div class="unit"> </div>
+      </div>
 
       <div class="data-card">
         <h2>RPM</h2>
@@ -84,6 +92,11 @@
         <div class="value" id="bms-temp">--</div>
         <div class="unit">°C</div>
       </div>
+      <div class="data-card">
+        <h2>📍 Localização</h2>
+        <div class="value" id="location">--</div>
+        <div class="unit"> </div>
+      </div>
     </div>
 
 
@@ -116,14 +129,56 @@
         </table>
       </div>
     </div>
-    <button id="start-gps-btn" class="btn">
-      📍 Iniciar GPS do Celular
-    </button>
+
+
+
+
+    <div class="can-section">
+      <h2 class="can-header">
+        Dados decodificados
+        <button id="download-device-data">📥</button>
+      </h2>
+      <div class="can-table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Modo</th>
+              <th>RPM</th>
+              <th>Torque</th>
+              <th>SoC (%)</th>
+              <th>Temp. Motor (°C)</th>
+              <th>Temp. Bateria (°C)</th>
+              <th>Tensão (V)</th>
+              <th>Corrente (A)</th>
+              <th>Localização</th>
+            </tr>
+          </thead>
+          <!-- ID fixo para o tbody: JS vai injetar as linhas aqui -->
+          <tbody id="vehicle-data-body">
+            <!-- Mensagem de "vazio" exibida por padrão -->
+            <tr id="empty-row">
+              <td colspan="10" class="empty">Nenhum dado de veículo recebido.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <script src="helpers.js"></script>
+      <script src="VehicleDataTable.js"></script>
+
+
+      <!-- GPS Simplificado -->
+      <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+        <button id="gps-btn" class="btn">📍 Buscar GPS</button>
+        <span id="gps-label"
+          style="font-size: 0.9em; color: #4CAF50; background: rgba(76,175,80,0.1); padding: 6px 12px; border-radius: 6px; min-width: 220px; text-align: center;">
+          Aguardando...
+        </span>
+    </div>
+
     <div id="gps-status" style="margin-top: 8px; font-size: 0.9em; color: #666;"></div>
 
-    <button onclick="enviarLocalizacaoParaServidor('esp32-moto-001')">
-  Enviar Minha Localização
-</button>
     <footer>
       &copy; 2025 Sistema de Monitoramento Voltz | Dados da rede CAN via API
     </footer>

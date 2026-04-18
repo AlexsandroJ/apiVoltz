@@ -30,7 +30,7 @@ app.use(cors(corsOptions));
 app.use('/api', canRoutes);
 
 // Servir arquivos estáticos da pasta 'public'
-//app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 /**/
 // Rota para acessar o dashboard

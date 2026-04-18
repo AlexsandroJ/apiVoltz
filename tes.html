@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste GPS</title>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2>🛰️ Teste de GPS</h2>
+  <p id="res">Clique no botão:</p>
+  <button onclick="testar()" style="padding: 10px 16px; font-size: 16px;">📍 Pegar Localização</button>
+
+  <script>
+    function testar() {
+      const el = document.getElementById('res');
+      if (!navigator.geolocation) {
+        el.innerHTML = "❌ API não existe neste navegador."; return;
+      }
+      if (location.protocol !== "https:" && location.hostname !== "localhost") {
+        el.innerHTML = "⚠️ GPS exige <b>HTTPS</b> ou <b>localhost</b>.<br>Protocolo atual: " + location.protocol; return;
+      }
+      el.innerHTML = "⏳ Aguardando permissão...";
+      navigator.geolocation.getCurrentPosition(
+        p => el.innerHTML = `✅ FUNCIONOU!<br>Lat: ${p.coords.latitude.toFixed(6)}<br>Lon: ${p.coords.longitude.toFixed(6)}`,
+        e => {
+          const erros = ["Permissão negada", "Sinal indisponível", "Timeout"];
+          el.innerHTML = `❌ ${erros[e.code-1] || "Erro desconhecido"}`;
+        }
+      );
+    }
+  </script>
+</body>
+</html>
