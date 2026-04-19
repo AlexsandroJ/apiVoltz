@@ -35,7 +35,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /**/
 // Rota para acessar o dashboard
 app.get('/dashboard', (req, res) => {
-  //res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Rota raiz

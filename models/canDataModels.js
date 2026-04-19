@@ -7,7 +7,7 @@ const vehicleDataSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    
+
     default: () => {
       const now = new Date();
       const year = now.getFullYear();
@@ -19,7 +19,7 @@ const vehicleDataSchema = new mongoose.Schema({
       const formatted = `${year}${month}${day}-${hour}${minute}${second}`;
       return `voltz-${formatted}`;
     }
-    
+
   },
 
   // Timestamp principal do evento
@@ -27,11 +27,6 @@ const vehicleDataSchema = new mongoose.Schema({
     type: Date,
   },
   // === DADOS INTERPRETADOS (para dashboard) ===
-  // Velocidade (km/h)
-  speed: {
-    type: Number,
-    default: 0
-  },
 
   // Bateria
   battery: {
@@ -51,21 +46,32 @@ const vehicleDataSchema = new mongoose.Schema({
     modo: { type: String }
   },
 
- location: {
+  location: {
     type: { type: String, enum: ['Point'] },
     coordinates: { type: [Number] } // aceita qualquer array (ou ausente)
   },
 
   // Precisão do GPS (opcional, fora de location)
-  gpsAccuracy: {
+  accuracy: {
     type: Number,
-    default: 0
   },
+  speed: {
+    type: Number,
+  },
+  altitude: {
+    type: Number,
+  },
+  altitudeAccuracy: {
+    type: Number,
+  },
+  heading: {
+    type: Number,
+  }
 
 
 }, {
   timestamps: true, // createdAt, updatedAt
-  
+
 });
 
 

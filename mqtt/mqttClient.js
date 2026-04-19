@@ -1,6 +1,5 @@
 // mqtt/mqttClient.js
 const mqtt = require('mqtt');
-const { processTelemetryMessage } = require('../controllers/telemetryController');
 const { addCanMessage, getDecodedCanData } = require('../utils/api');
 
 const MQTT_BROKER = process.env.MQTT_BROKER;

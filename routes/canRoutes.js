@@ -6,13 +6,15 @@ const {
   getVehicleData,
   addCanMessage,
   getRecentCanData,
-  getDecodedCanData,
   exportAllCanDataAsCsv,
   exportVehicleDataAsCsv,
-  addLocationToLatestVehicleData
 } = require('../controllers/canController');
 
-const { updateDeviceLocation } = require('../controllers/telemetryController');
+const {
+  upsertCurrentLocation,
+  getCurrentLocation
+} = require('../controllers/currentLocationController');
+
 
 /**
  * @swagger
@@ -177,6 +179,10 @@ router.get('/export-can-data-csv', exportAllCanDataAsCsv);
  */
 router.get('/export-vehicle-data-csv', exportVehicleDataAsCsv);
 
-router.post('/device/location', addLocationToLatestVehicleData);
+router.post('/device/location', upsertCurrentLocation);
+
+router.get('/device/location', getCurrentLocation);
+
+
 
 module.exports = router;

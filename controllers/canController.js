@@ -16,10 +16,8 @@
 
 const VehicleData = require('../models/canDataModels');
 const CanFrame = require('../models/canFrameModels');
-// controllers/canController.js
+const CurrentLocation = require('../models/currentLocationModels'); // mesmo arquivo, modelo diferente
 const { decodeCanFrame } = require('../utils/canDecoder');
-const useInMemoryDB = process.env.DEV;
-
 
 /**
  * Salva um novo registro de dados do veículo.
@@ -43,7 +41,7 @@ const useInMemoryDB = process.env.DEV;
  */
 exports.createVehicleData = async (req, res) => {
   try {
-    const data = new VehicleData(req.body);
+    const data = new VehicleData();
     const savedData = await data.save();
     res.status(201).json(savedData);
   } catch (error) {
@@ -84,12 +82,13 @@ exports.getVehicleData = async (req, res) => {
       .exec();
 
     if (data.length === 0) {
-      return res.status(404).json({ error: `Nenhum dado encontrado para o` });
+      return res.status(404).json({ error: `Nenhum dado encontrado` });
     }
+
 
     res.json(data);
   } catch (error) {
-    console.error(`Erro ao buscar dados do dispositivo ${deviceId}:`, error);
+    console.error(`Erro ao buscar dados`, error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 };
@@ -133,7 +132,7 @@ exports.addCanMessage = async (req, res) => {
 
 
     const framesToInsert = canMessages.map(msg => ({
-      
+
       canId: msg.canId,
       data: msg.data,
       dlc: msg.dlc,
@@ -150,7 +149,7 @@ exports.addCanMessage = async (req, res) => {
       }
 
     });
-
+    
     // Insere todos os frames de uma só vez
     const result = await CanFrame.insertMany(framesToInsert);
 
@@ -209,7 +208,6 @@ exports.getRecentCanData = async (req, res) => {
   }
 };
 
-
 /**
  * Exporta todos os dados CAN do banco como CSV (com streaming para evitar memory leak).
  * 
@@ -259,7 +257,6 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
   const headers = [
     'timestamp',
     'deviceId',
-    'speed',
     'battery.soc',
     'battery.soh',
     'battery.voltage',
@@ -270,7 +267,11 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
     'motor.torque',
     'motor.motorTemp',
     'motor.controlTemp',
-    'gpsAccuracy',
+    'accuracy',
+    'altitude',
+    'altitudeAccuracy',
+    'heading',
+    'speed',
     'location.coordinates'
   ];
 
@@ -289,7 +290,6 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
     const row = [
       `"${doc.timestamp?.toISOString() || ''}"`,
       `"${doc.deviceId || ''}"`,
-      doc.speed ?? '',
       doc.battery?.soc ?? '',
       doc.battery?.soh ?? '',
       doc.battery?.voltage ?? '',
@@ -300,7 +300,11 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
       doc.motor?.torque ?? '',
       doc.motor?.motorTemp ?? '',
       doc.motor?.controlTemp ?? '',
-      doc.gpsAccuracy ?? '',
+      doc.speed ?? '',
+      doc.altitude ?? '',
+      doc.altitudeAccuracy ?? '',
+      doc.heading ?? '',
+      doc.accuracy ?? '',
       doc.location?.coordinates ? `"${doc.location.coordinates.join(',')}"` : ''
     ].map(field => {
       // Escapa aspas dentro dos campos (boa prática)
@@ -316,112 +320,139 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
   res.end();
 };
 
-exports.addLocationToLatestVehicleData = async (req, res) => {
-  const { latitude, longitude, accuracy } = req.body;
-
-  // Validação básica
-  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-    return res.status(400).json({ error: 'latitude e longitude são obrigatórios e devem ser números' });
-  }
-  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return res.status(400).json({ error: 'Coordenadas fora do intervalo válido' });
-  }
-
-  try {
-    // 1. Busca o último registro de VehicleData
-    const lastRecord = await VehicleData.findOne().sort({ timestamp: -1 });
-
-    if (!lastRecord) {
-      return res.status(404).json({ error: 'Nenhum dado de veículo encontrado para atualizar' });
-    }
-
-    // 2. Cria um novo documento com base no último, adicionando localização
-    const newRecord = new VehicleData({
-      ...lastRecord.toObject(), // copia todos os campos
-      _id: undefined,          // força novo ID
-      createdAt: undefined,    // força novo createdAt
-      updatedAt: undefined,    // força novo updatedAt
-      location: {
-        type: 'Point',
-        coordinates: [longitude, latitude] // GeoJSON: [lon, lat]
-      },
-      gpsAccuracy: accuracy
-    });
-
-    // 3. Salva novo registro
-    const saved = await newRecord.save();
-
-    res.status(201).json(saved);
-
-  } catch (error) {
-    console.error('Erro ao adicionar localização:', error);
-    res.status(500).json({ error: 'Falha ao salvar localização' });
-  }
-};
-
+/**
+ * Processa um frame decodificado e salva como novo registro histórico,
+ * mesclando com a localização GPS mais recente.
+ * 
+ * @param {Object} decodedFrame - Dados decodificados do CAN/frame
+ * @param {Date|Number} timestamp - Timestamp do evento
+ */
 async function processDecodedFrame(decodedFrame, timestamp) {
   try {
+    // ========================================
+    // 1️⃣ BUSCA DADOS AUXILIARES EM PARALELO
+    // ========================================
 
-    const lastValidLocation = await VehicleData.findOne({
-      'location.coordinates': { $exists: true, $ne: [], $size: 2 }
-    }).sort({ timestamp: -1 }).select('location').lean();
+    // Busca a localização GPS atual (modelo singleton)
+    const currentGPS = await CurrentLocation.findOne()
+      .sort({ createdAt: -1 })
+      .select('location speed altitude altitudeAccuracy heading accuracy')
+      .lean();
+    // Busca o último registro histórico completo
+    const lastRecord = await VehicleData.findOne()
+      .sort({ timestamp: -1 })
+      .lean();
 
-    // 1. Busca o último registro completo
-    const lastRecord = await VehicleData.findOne({}).sort({ timestamp: -1 }).lean();
 
-    // 2. Define base: usa último registro ou objeto vazio
+    // ========================================
+    // 2️⃣ PREPARA BASE DE DADOS
+    // ========================================
+
+    // Base: último registro OU objeto vazio
     const base = lastRecord || {};
 
-    // 3. Mescla campos de forma segura
-    const newRecord = {
-      // Campos simples: só atualiza se vierem no frame
+    // ========================================
+    // 3️⃣ FUNÇÕES AUXILIARES DE MERGE
+    // ========================================
 
-      ...(decodedFrame.speed !== undefined && { speed: decodedFrame.speed }),
-      ...(decodedFrame.gpsAccuracy !== undefined && { gpsAccuracy: decodedFrame.gpsAccuracy }),
+    /**
+     * Retorna o valor do frame, ou fallback para base, ou undefined
+     * Ignora valores "zerados" indesejados (opcional, ajuste conforme necessidade)
+     */
+    const getValue = (frameKey, baseKey = frameKey, ignoreZero = false) => {
+      const frameVal = decodedFrame[frameKey];
+      const baseVal = base[baseKey];
 
-      // Subdocumentos: mescla com o anterior
-      battery: {
-        ...(base.battery || {}),
-        ...(decodedFrame.battery || {})
-      },
-      motor: {
-        ...(base.motor || {}),
-        ...(decodedFrame.motor || {})
-      },
-
-      // ✅ Localização: só define se tiver nova OU herdar válida
-      ...(decodedFrame.location?.coordinates?.length === 2
-        ? {
-          location: {
-            type: 'Point',
-            coordinates: decodedFrame.location.coordinates
-          }
-        }
-        : lastValidLocation?.location
-          ? { location: lastValidLocation.location }
-          : {}),
-
-      timestamp: timestamp
+      if (frameVal !== undefined && frameVal !== null) {
+        // Se ignorar zero: só usa se for diferente de 0
+        if (ignoreZero && frameVal === 0) return baseVal;
+        return frameVal;
+      }
+      return baseVal;
     };
 
-    // 4. Salva novo estado completo
-    const doc = new VehicleData(newRecord);
+    /**
+     * Mescla subdocumentos (ex: battery, motor) de forma segura
+     */
+    const mergeSubdoc = (key) => ({
+      ...(base[key] || {}),
+      ...(decodedFrame[key] || {})
+    });
+
+    // ========================================
+    // 4️⃣ MONTA NOVO REGISTRO
+    // ========================================
+    
+    const newRecord = {
+      // 🔹 Mescla simples: decodedFrame → currentGPS → base → null
+      speed: currentGPS?.speed ?? null ?? undefined,
+      altitude:  currentGPS?.altitude ?? null ?? undefined,
+      altitudeAccuracy:  currentGPS?.altitudeAccuracy ??  null ?? undefined,
+      heading: currentGPS?.heading ?? null ?? undefined,
+      accuracy: currentGPS?.accuracy ?? null ?? undefined,
+
+
+      // 🔹 Subdocumentos: merge profundo
+      battery: mergeSubdoc('battery'),
+      motor: mergeSubdoc('motor'),
+
+      // 🔹 Localização: prioridade máxima para GPS atual
+      // Se decodedFrame trouxer location válida, usa ela
+      // Senão, tenta usar a do CurrentLocation
+      // Por último, mantém a do histórico (se existir)
+      location: (() => {
+        // 1. Frame tem coordenadas válidas?
+        if (decodedFrame.location?.coordinates?.length === 2) {
+          return {
+            type: 'Point',
+            coordinates: decodedFrame.location.coordinates
+          };
+        }
+        // 2. CurrentLocation tem dados válidos?
+        if (currentGPS?.location?.coordinates?.length === 2) {
+          return {
+            type: 'Point',
+            coordinates: currentGPS.location.coordinates
+          };
+        }
+        // 3. Fallback: mantém do histórico
+        return base.location || undefined;
+      })(),
+
+      // 🔹 Campos de controle do Mongoose (forçar novos)
+      _id: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+
+      // 🔹 Timestamp do evento (obrigatório)
+      timestamp: new Date(timestamp)
+    };
+
+    // ========================================
+    // 5️⃣ FILTRA CAMPOS UNDEFINED (OPCIONAL)
+    // ========================================
+
+    // Remove chaves com valor undefined para não sobrescrever com null no banco
+    const cleanRecord = Object.fromEntries(
+      Object.entries(newRecord).filter(([_, v]) => v !== undefined)
+    );
+
+    // ========================================
+    // 6️⃣ SALVA NOVO DOCUMENTO
+    // ========================================
+
+    const doc = new VehicleData(cleanRecord);
     await doc.save();
-    //console.log('🆕 Novo registro salvo:', doc);
+    return doc; // Retorna para chaining ou testes
 
   } catch (error) {
-    console.error('❌ Erro ao processar frame:', error);
-  }
-}
+    console.error('❌ Erro ao processar frame:', {
+      message: error.message,
+      stack: error.stack,
+      frameKeys: decodedFrame ? Object.keys(decodedFrame) : 'N/A'
+    });
 
-// Busca o último registro com localização válida
-async function getLastValidLocation() {
-  return await VehicleData.findOne({
-    'location.coordinates': { $exists: true, $ne: [], $size: 2 },
-    'location.coordinates.0': { $type: 'number' },
-    'location.coordinates.1': { $type: 'number' }
-  })
-    .sort({ timestamp: -1 }) // mais recente primeiro
-    .select('location') // só os campos necessários
-    .lean();
+    // Lança o erro para quem chamou poder tratar (opcional)
+    throw error;
+  }
 }

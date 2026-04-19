@@ -8,3 +8,9 @@ DB_PORT=27017
 DB_NAME=Cluster0
 DEV=true
 API_URL=http://localhost:3001
+
+BASE_BATTERY_ID=0x0000
+BASE_CONTROLLER_ID=0x0000
+
+MQTT_BROKER=mqtt://broker.hivemq.com
+MQTT_TOPIC=moto/telemetria
