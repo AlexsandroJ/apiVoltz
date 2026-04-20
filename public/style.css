@@ -159,6 +159,66 @@ h1 {
   background: #4caf50;
 }
 
+.btn-download {
+  background-color: transparent; /* Remove a cor de fundo */
+  border: none;     /* Opcional: adiciona uma borda */
+  color: none;               /* Cor do texto */
+  padding: 1px 5px;
+  cursor: pointer;
+  transition: 0.3s;             /* Deixa a mudança suave */
+}
+
+/* Quando o mouse passa por cima */
+.btn-download:hover {
+  background-color: #04975a;    /* Cor que aparece no hover */
+  color: white;                 /* Muda a cor do texto para contrastar */
+}
+
+
+
+/* Botão do GPS */
+
+.btn {
+  background-color: #0f1e2f;
+  border: 1px solid transparent;
+  border-radius: .75rem;
+  box-sizing: border-box;
+  color: #FFFFFF;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-family: "Inter var",ui-sans-serif,system-ui,-apple-system,system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  padding: .75rem 1.2rem;
+  text-align: center;
+  text-decoration: none #6B7280 solid;
+  text-decoration-thickness: auto;
+  transition-duration: .2s;
+  transition-property: background-color,border-color,color,fill,stroke;
+  transition-timing-function: cubic-bezier(.4, 0, 0.2, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  width: auto;
+}
+
+.btn:hover {
+  background-color: #04975a;
+}
+
+.btn:focus {
+  box-shadow: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .btn {
+    padding: .75rem 1.5rem;
+  }
+}
+
 /* Botão de Tema */
 #theme-toggle {
   position: absolute;
@@ -297,7 +357,46 @@ tr:last-child td {
   overflow: hidden;
 }
 
+/* Estilo Base (Para Computadores/Telas Maiores) */
+.container-gps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap; /* Permite quebrar a linha se faltar espaço */
+  padding: 10px;
+}
+
+#gps-label {
+  font-size: 0.9em;
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  min-width: 220px;
+  text-align: center;
+}
+
 /* Responsividade */
+
+
+/* Estilo para Celulares (Telas até 600px) */
+@media (max-width: 600px) {
+  .container-gps {
+    flex-direction: column; /* Empilha o botão e o texto */
+    align-items: stretch;   /* Faz os elementos ocuparem a largura total */
+  }
+
+  #gps-label {
+    min-width: unset;       /* Remove a largura mínima fixa no celular */
+    width: 100%;            /* Ocupa toda a largura disponível */
+  }
+
+  .btn {
+    width: 100%;            /* Deixa o botão mais fácil de clicar no celular */
+  }
+}
+
 
 /* Tablets (768px a 1023px) */
 @media (max-width: 1023px) {
@@ -381,6 +480,8 @@ tr:last-child td {
     font-size: 0.85rem;
   }
 }
+
+
 
 /* Celulares pequenos */
 @media (max-width: 480px) {
