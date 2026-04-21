@@ -1,13 +1,14 @@
 // ------------------------------------------------------------------
 // --- BIBLIOTECAS ---
 // ------------------------------------------------------------------
-#include <ESP32-TWAI-CAN.hpp> // ESP32-TWAI-CAN by sorek.uk
-#include <PubSubClient.h>     // MQTT
-#include <WiFi.h>             // WiFi
+#include <ESP32-TWAI-CAN.hpp>  // ESP32-TWAI-CAN by sorek.uk
+#include <PubSubClient.h>      // MQTT
+#include <WiFi.h>              // WiFi
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
-#include <ArduinoJson.h>      // Para gerar JSON facilmente
+#include <ArduinoJson.h>  // Para gerar JSON facilmente
+#include "time.h"
 #include "../../config/constants.h"
 
 // ------------------------------------------------------------------
@@ -15,15 +16,21 @@
 // ------------------------------------------------------------------
 #define CAN_TX_PIN 2
 #define CAN_RX_PIN 15
-#define TESTMODE true      // true = Simula, false = Lê CAN real
+#define TESTMODE true  // true = Simula, false = Lê CAN real
 #define DEBUGMODE false
+#define BufferSize 500
 
 const char* ssid = "Salvacao_2_conto";
 const char* password = "mimda2conto";
 const char* mqtt_server = "broker.hivemq.com";
-const char* MQTT_TOPIC = "moto/telemetria" ; 
+const char* MQTT_TOPIC = "moto/telemetria";
 const int mqtt_port = 1883;
+struct timeval tv;
 
+// Configurações do Fuso Horário (Ex: Brasília é -3h)
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = -3 * 3600;  // -3 horas em segundos
+const int daylightOffset_sec = 0;      // Horário de verão (0 se não houver)
 
 // ------------------------------------------------------------------
 // --- ESTRUTURAS E VARIÁVEIS GLOBAIS ---
@@ -65,20 +72,37 @@ void reconnectMQTT() {
 // ------------------------------------------------------------------
 
 // 1. Task de Leitura/Simulação CAN
-void canSourceTask(void *pvParameters) {
-  const unsigned long SIM_INTERVAL_MS = 100; // Intervalo da simulação
-  
+void canSourceTask(void* pvParameters) {
+  const unsigned long SIM_INTERVAL_MS = 100;  // Intervalo da simulação
+
   while (true) {
     CanMessage frame;
-    
+
     if (TESTMODE) {
       // --- MODO SIMULAÇÃO ---
       frame.id = (random(1, 100) < 70)
-        ? (random(0, 2) == 0 ? BASE_BATTERY_ID : BASE_CONTROLLER_ID)
-        : random(0x000, 0x7FF + 1);
+                   ? (random(0, 2) == 0 ? BASE_BATTERY_ID : BASE_CONTROLLER_ID)
+                   : random(0x000, 0x7FF + 1);
       frame.length = 8;
       frame.isExtended = false;
-      for (int i = 0; i < 8; i++) frame.data[i] = random(0, 255);
+      for (int i = 0; i < 8; i++) {
+        if (i == 5) {
+          int choice = random(0, 3);  
+          switch (choice) {
+            case 0:
+              frame.data[i] = 0x45;
+              break;
+            case 1:
+              frame.data[i] = 0x4D;
+              break;
+            case 2:
+              frame.data[i] = 0x55;
+              break;
+          }
+        } else {
+          frame.data[i] = random(0, 255);
+        }
+      }
     } else {
       // --- MODO REAL ---
       twai_message_t rx;
@@ -88,8 +112,8 @@ void canSourceTask(void *pvParameters) {
         frame.isExtended = (rx.flags & TWAI_MSG_FLAG_EXTD) != 0;
         memcpy(frame.data, rx.data, rx.data_length_code);
       } else {
-        vTaskDelay(1 / portTICK_PERIOD_MS); // Aguarda se não houver dado
-        continue; 
+        vTaskDelay(1 / portTICK_PERIOD_MS);  // Aguarda se não houver dado
+        continue;
       }
     }
 
@@ -97,13 +121,13 @@ void canSourceTask(void *pvParameters) {
     if (xQueueSend(canRawQueue, &frame, pdMS_TO_TICKS(100)) != pdTRUE) {
       Serial.println("Fila cheia! Frame descartado.");
     }
-    
+
     if (TESTMODE) vTaskDelay(SIM_INTERVAL_MS / portTICK_PERIOD_MS);
   }
 }
 
 // 2. Task de Publicação MQTT (Consome dados brutos)
-void mqttPublisherTask(void *pvParameters) {
+void mqttPublisherTask(void* pvParameters) {
   CanMessage rawFrame;
   char jsonBuffer[256];
 
@@ -119,12 +143,12 @@ void mqttPublisherTask(void *pvParameters) {
 
     // Recebe frame bruto da fila (bloqueia até chegar dado)
     if (xQueueReceive(canRawQueue, &rawFrame, portMAX_DELAY) == pdTRUE) {
-      
+
       // Monta JSON com dados brutos (Hexadecimal para facilitar leitura de CAN)
       StaticJsonDocument<256> doc;
       doc["canId"] = rawFrame.id;
       doc["ide"] = rawFrame.isExtended;
-      
+
       // Converte array de bytes para string Hex "AA BB CC..."
       String dataHex = "";
       for (int i = 0; i < rawFrame.length; i++) {
@@ -135,8 +159,22 @@ void mqttPublisherTask(void *pvParameters) {
       }
       doc["data"] = dataHex;
       doc["dlc"] = rawFrame.length;
-      doc["ts"] = millis();
 
+      struct tm timeinfo;
+      if (!getLocalTime(&timeinfo)) {
+        Serial.println("Falha ao obter a hora");
+        doc["ts"] = millis();
+      } else {
+        // Mostra a data formatada no Serial
+        //Serial.println(&timeinfo, "%d/%m/%Y %H:%M:%S");
+
+        // Para enviar ao JS, você pegaria o timestamp:
+        time_t agora;
+        time(&agora);
+        //Serial.printf("Timestamp para o JS: %ld\n", agora);
+
+        doc["ts"] = agora;
+      }
       // Serializa para string
       serializeJson(doc, jsonBuffer, sizeof(jsonBuffer));
 
@@ -155,9 +193,9 @@ void mqttPublisherTask(void *pvParameters) {
 // ------------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
-  
+
   // Inicializa Fila
-  canRawQueue = xQueueCreate(10, sizeof(CanMessage)); // Buffer para 10 frames
+  canRawQueue = xQueueCreate(BufferSize, sizeof(CanMessage));  // Buffer para 10 frames
 
   // Inicializa CAN
   ESP32Can.setPins(CAN_TX_PIN, CAN_RX_PIN);
@@ -166,7 +204,7 @@ void setup() {
       Serial.println("CAN Real Iniciado");
     } else {
       Serial.println("Erro ao iniciar CAN");
-      while(1) delay(1000);
+      while (1) delay(1000);
     }
   } else {
     Serial.println("Modo Simulação Ativo");
@@ -179,7 +217,8 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("\nWiFi Conectado");
-
+  // Inicia a sincronização com o servidor NTP para horario
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   // Cria Tasks
   // Prioridade 1 para ambas, rodando em núcleos diferentes se desejar (affinity NULL)
   xTaskCreate(canSourceTask, "CAN_Source", 4096, NULL, 1, NULL);

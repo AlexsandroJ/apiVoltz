@@ -7,7 +7,7 @@ const canFrameSchema = new mongoose.Schema({
   data: [{ type: Number, required: true }],
   dlc: { type: Number, required: true },
   ide: { type: Boolean, default: false },
-  timestamp: { type: Date, default: Date.now, index: true }
+  timestamp: { type: Date, index: true }
 });
 
 // Índices para consultas rápidas

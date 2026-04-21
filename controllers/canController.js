@@ -123,22 +123,26 @@ exports.addCanMessage = async (req, res) => {
           error: 'Dados incompletos',
           message: 'Cada frame CAN deve conter canId e data'
         });
-      }
 
+        
+      }
+      
       const hexArray = msg.data.split(' '); // Transforma em ["09", "D8", ...]
       const numericData = hexArray.map(hex => parseInt(hex, 16)); // Converte para [9, 216, 14, ...]
       msg.data = numericData; // Adiciona o array numérico para facilitar consultas futuras
     }
 
-
+    
     const framesToInsert = canMessages.map(msg => ({
 
       canId: msg.canId,
       data: msg.data,
       dlc: msg.dlc,
       ide: msg.ide || false,
-      timestamp: new Date(msg.ts)
+      timestamp: msg.ts*1000
     }));
+
+    
 
     framesToInsert.forEach(element => {
       const decodedFrame = decodeCanFrame(element);

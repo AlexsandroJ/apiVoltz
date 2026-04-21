@@ -31,7 +31,7 @@ async function connectMQTT() {
         const payload = message.toString();
         const data = JSON.parse(payload);
         //data.deviceId = data.deviceId || 'unknown-device'; // Garantir que deviceId exista
-
+        
         await addCanMessage(data); // Enviar para API
 
         

@@ -99,13 +99,6 @@
       </div>
     </div>
 
-
-    <!-- Área do Mapa -->
-    <div class="map-section">
-      <h2>📍 Localização</h2>
-      <div id="map"></div>
-    </div>
-
     <!-- Área de Log CAN -->
     <div class="can-section">
       <h2 class="can-header">
@@ -126,7 +119,10 @@
             </tr>
           </thead>
           <tbody id="can-body">
-
+            <!-- Mensagem de "vazio" exibida por padrão -->
+            <tr id="empty-row">
+              <td colspan="10" class="empty">Nenhum dado recebido.</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -167,7 +163,7 @@
           <tbody id="vehicle-data-body">
             <!-- Mensagem de "vazio" exibida por padrão -->
             <tr id="empty-row">
-              <td colspan="10" class="empty">Nenhum dado de veículo recebido.</td>
+              <td colspan="10" class="empty">Nenhum dado recebido.</td>
             </tr>
           </tbody>
         </table>
@@ -179,7 +175,11 @@
         <button id="gps-btn" class="btn">🔎 Buscar GPS 📍</button>
         <span id="gps-label">Aguardando...</span>
       </div>
-
+      <!-- Área do Mapa -->
+      <div class="map-section">
+        <h2>📍 Localização</h2>
+        <div id="map"></div>
+      </div>
 
       <div id="gps-status" style="margin-top: 8px; font-size: 0.9em; color: #666;"></div>
 

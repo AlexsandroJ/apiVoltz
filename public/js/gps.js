@@ -204,7 +204,7 @@ export function stopTracking() {
   _isTracking = false;
   if (_uiElements?.btn) {
     _uiElements.btn.disabled = false;
-    _uiElements.btn.textContent = '📍 Iniciar GPS';
+    _uiElements.btn.textContent = '🔎 Buscar GPS 📍';
   }
   if (_uiElements?.label) {
     _uiElements.label.textContent = 'GPS parado';
