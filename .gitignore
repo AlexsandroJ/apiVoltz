@@ -12,7 +12,7 @@ yarn-debug.log
 # Build
 dist/
 build/
-config/*
+config/constants.h
 
 # IDE
 .idea/
