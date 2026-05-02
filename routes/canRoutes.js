@@ -380,7 +380,7 @@ router.post('/device', createVehicleData);
  *             schema:
  *               $ref: "#/components/schemas/ErrorResponse"
  */
-router.get('/device/:deviceId', getVehicleData);
+router.get('/device', getVehicleData);
 
 // ============================================================================
 // 📡 ENDPOINTS - CAN Bus
@@ -437,7 +437,7 @@ router.get('/device/:deviceId', getVehicleData);
  *       404:
  *         description: "deviceId não encontrado"
  */
-router.post('/can/:deviceId', addCanMessage);
+router.post('/can', addCanMessage);
 
 /**
  * @swagger

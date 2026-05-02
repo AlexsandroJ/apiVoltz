@@ -13,6 +13,8 @@ yarn-debug.log
 dist/
 build/
 config/constants.h
+config/cert.pem
+config/key.pem
 
 # IDE
 .idea/

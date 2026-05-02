@@ -1,16 +1,26 @@
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Ela desativa a verificação de certificados para todas as requisições feitas pelo seu processo Node
+
 const { app } = require('./app');
+const fs = require('fs');
 const { connectDB } = require('./database/db');
 const { handleWebSocketMessage, addData, sendMessage } = require('./utils/handleWebSocketMessage');
-const http = require('http');
+const https = require('https');
 const WebSocket = require('ws');
 const PORT = process.env.PORT || 3001;
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const path = require('path');
+
 const { connectMQTT } = require('./mqtt/mqttClient');
 
+const sslOptions = {
+  key: fs.readFileSync(path.join(__dirname, 'config', 'key.pem')),
+  cert: fs.readFileSync(path.join(__dirname, 'config', 'cert.pem'))
+};
 
-/*
+const server = https.createServer(sslOptions, app);
+
+const wss = new WebSocket.Server({ server });
+
 wss.on('connection', async (ws, req) => {
 
   ws.on('message', (message) => {
@@ -38,7 +48,7 @@ wss.on('connection', async (ws, req) => {
 
   ws.send(JSON.stringify({ message: 'Conectado ao servidor WebSocket' }));
 });
-*/
+
 
 connectDB()
   .then(() => {

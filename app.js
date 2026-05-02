@@ -10,13 +10,9 @@ const bodyParser = require('body-parser');
 // Inicializa o app
 const app = express();
 
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://seu-dominio.com', 'https://outra-url.com'] // domínios permitidos em produção
-    : ['http://localhost:3000'], // só permite o frontend do React
-  credentials: true, // se usar cookies/sessões
-  optionsSuccessStatus: 200
-};
+app.use(cors({
+  origin: '*', // Permite todas as origens
+}));
 
 
 // Configura middlewares
@@ -24,7 +20,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use(cors(corsOptions));
+//app.use(cors(corsOptions));
 
 // Rotas
 app.use('/api', canRoutes);
