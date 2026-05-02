@@ -43,7 +43,7 @@ async function connectMQTT() {
   });
 
   client.on('error', (err) => {
-    console.error('❌ Erro no cliente MQTT:', err);
+    console.error('❌ Erro no cliente MQTT:', err.message);
   });
 
   client.on('reconnect', () => {

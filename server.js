@@ -13,8 +13,8 @@ const path = require('path');
 const { connectMQTT } = require('./mqtt/mqttClient');
 
 const sslOptions = {
-  key: fs.readFileSync(path.join(__dirname, 'config', 'key.pem')),
-  cert: fs.readFileSync(path.join(__dirname, 'config', 'cert.pem'))
+  key: fs.readFileSync(path.join(__dirname, 'config', 'key.pem.example')),
+  cert: fs.readFileSync(path.join(__dirname, 'config', 'cert.pem.example'))
 };
 
 const server = https.createServer(sslOptions, app);
