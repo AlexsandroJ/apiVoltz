@@ -20,9 +20,9 @@
 #define DEBUGMODE false
 #define BufferSize 500
 
-const char* ssid = "Salvacao_2_conto";
-const char* password = "mimda2conto";
-const char* mqtt_server = "broker.hivemq.com";
+const char* ssid = "Voltz";
+const char* password = "12345678";
+const char* mqtt_server = "192.168.43.168";
 const char* MQTT_TOPIC = "moto/telemetria";
 const int mqtt_port = 1883;
 struct timeval tv;
