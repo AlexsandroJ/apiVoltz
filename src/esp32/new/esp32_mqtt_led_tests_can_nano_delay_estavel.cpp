@@ -87,7 +87,9 @@ void canSourceTask(void* pvParameters) {
     bool hasData = false;
 
     if (TESTMODE) {
-      frame.id = (random(1, 100) < 70) ? 0x121 : 0x300;
+      frame.id = (random(1, 100) < 70)
+                   ? (random(0, 2) == 0 ? BASE_BATTERY_ID : BASE_CONTROLLER_ID)
+                   : random(0x000, 0x7FF + 1);
       frame.length = 8;
       frame.isExtended = false;
       for (int i = 0; i < 8; i++) {
