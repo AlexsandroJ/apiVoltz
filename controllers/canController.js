@@ -18,6 +18,7 @@ const VehicleData = require('../models/canDataModels');
 const CanFrame = require('../models/canFrameModels');
 const CurrentLocation = require('../models/currentLocationModels'); // mesmo arquivo, modelo diferente
 const { decodeCanFrame } = require('../utils/canDecoder');
+const { formatTimestamp } = require('../public/js/utils');
 
 /**
  * Salva um novo registro de dados do veículo.
@@ -139,7 +140,7 @@ exports.addCanMessage = async (req, res) => {
       data: msg.data,
       dlc: msg.dlc,
       ide: msg.ide || false,
-      timestamp: msg.ts*1000
+      timestamp: msg.ts
     }));
 
     
@@ -239,7 +240,7 @@ exports.exportAllCanDataAsCsv = async (req, res) => {
   const cursor = CanFrame.find(query).sort({ timestamp: 1 }).cursor();
   for await (const frame of cursor) {
     const row = [
-      `"${frame.timestamp.toISOString()}"`,
+      `"${formatTimestamp(frame.timestamp)}"`,
       `"0x${frame.canId.toString(16).toUpperCase()}"`,
       `"${frame.data.join(' ')}"`,
       frame.dlc,
@@ -260,6 +261,7 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
   // Define cabeçalho do CSV
   const headers = [
     'timestamp',
+    'ms',
     'deviceId',
     'battery.soc',
     'battery.soh',
@@ -292,8 +294,8 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
 
   for await (const doc of cursor) {
     const row = [
-      `"${doc.timestamp?.toISOString() || ''}"`,
-      `"${doc.deviceId || ''}"`,
+      formatTimestamp(doc.timestamp) || '',
+      doc.deviceId || '',
       doc.battery?.soc ?? '',
       doc.battery?.soh ?? '',
       doc.battery?.voltage ?? '',
@@ -429,7 +431,7 @@ async function processDecodedFrame(decodedFrame, timestamp) {
       updatedAt: undefined,
 
       // 🔹 Timestamp do evento (obrigatório)
-      timestamp: new Date(timestamp)
+      timestamp: timestamp
     };
 
     // ========================================
