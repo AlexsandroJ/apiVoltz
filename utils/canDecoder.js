@@ -23,7 +23,6 @@ function modo(params) {
   if (params == 0x45) return "ECO";
   else if (params == 0x4D) return "STD";
   else if (params == 0x55) return "TURBO";
-  else return "UNKNOWN";
 }
 
 
@@ -41,7 +40,7 @@ function decodeMotorControllerData(data) {
   return {
     rpm: (data[0] * 256 + data[1]).toFixed(2),
     torque: ((data[2] * 256 + data[3]) * 0.1).toFixed(2),
-    motorTemp: (data[7] - 40).toFixed(2),
+    motorTemp: (data[7]*2).toFixed(2),
     controlTemp: (data[6] - 40).toFixed(2),
     modo: modo(data[5])
   };
