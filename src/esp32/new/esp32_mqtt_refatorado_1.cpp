@@ -234,6 +234,22 @@ void canSourceTask(void *pvParameters) {
     // Configuração do NTP para sincronizar o timestamp real
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
+    Serial.print("Aguardando sincronização NTP...");
+    struct tm timeinfo;
+    int tentativas = 0;
+    // Tenta obter o tempo por até 5 segundos
+    while (!getLocalTime(&timeinfo) && tentativas < 10) {
+      Serial.print(".");
+      delay(500);
+      tentativas++;
+    }
+
+    if (tentativas < 10) {
+      Serial.println("\nTempo sincronizado!");
+    } else {
+      Serial.println(
+          "\nFalha ao sincronizar. Usando tempo de boot (relativo).");
+    }
     // Inicialização do Driver CAN
     ESP32Can.setPins(CAN_TX_PIN, CAN_RX_PIN);
     if (!TESTMODE) {
