@@ -1,54 +1,57 @@
 // ------------------------------------------------------------------
 // --- BIBLIOTECAS ---
 // ------------------------------------------------------------------
-#include <ESP32-TWAI-CAN.hpp>  // ESP32-TWAI-CAN by sorek.uk
-#include <PubSubClient.h>      // MQTT
-#include <WiFi.h>              // WiFi
+#include <ESP32-TWAI-CAN.hpp> 
+#include <PubSubClient.h>      
+#include <WiFi.h>              
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
-#include <ArduinoJson.h>  // Para gerar JSON facilmente
+#include <ArduinoJson.h>  
 #include "time.h"
 #include "../../config/constants.h"
-
 // ------------------------------------------------------------------
 // --- CONFIGURAÇÕES ---
 // ------------------------------------------------------------------
 #define CAN_TX_PIN 2
 #define CAN_RX_PIN 15
-#define TESTMODE true  // true = Simula, false = Lê CAN real
+#define ledCAN 16
+#define ledMQTT 17
+
+#define TESTMODE true  // Se true, gera dados aleatórios para teste sem hardware CAN
 #define DEBUGMODE false
-#define BufferSize 500
+#define BufferSize 250  // Buffer aumentado para evitar perda em latências de rede
 
-const char* ssid = "Voltz";
-const char* password = "12345678";
-const char* mqtt_server = "192.168.43.168";
+const char *ssid = "Salvacao_2_conto";
+const char *password = "mimda2conto";
+const char *mqtt_server = "192.168.1.185";
 const char* MQTT_TOPIC = "moto/telemetria";
-const int mqtt_port = 1883;
-struct timeval tv;
+const int mqtt_port = 31125;
 
-// Configurações do Fuso Horário (Ex: Brasília é -3h)
+const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
+
+// Configurações do Fuso Horário (Brasil - Pernambuco)
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -3 * 3600;  // -3 horas em segundos
-const int daylightOffset_sec = 0;      // Horário de verão (0 se não houver)
+const long gmtOffset_sec = -3 * 3600; 
+const int daylightOffset_sec = 0;      
+
+// Intervalo que a Task MQTT acorda para limpar a fila
+const TickType_t TRANSMIT_INTERVAL = pdMS_TO_TICKS(50);
 
 // ------------------------------------------------------------------
 // --- ESTRUTURAS E VARIÁVEIS GLOBAIS ---
 // ------------------------------------------------------------------
 
-// Estrutura única para trafegar o frame bruto
 struct CanMessage {
   uint32_t id;
   uint8_t data[8];
   uint8_t length;
   bool isExtended;
+  int64_t timestamp; // Armazena o momento exato da leitura
 };
 
-// Objetos MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
-
-// Fila única para comunicação entre CAN e MQTT
 QueueHandle_t canRawQueue;
 
 // ------------------------------------------------------------------
@@ -56,30 +59,37 @@ QueueHandle_t canRawQueue;
 // ------------------------------------------------------------------
 
 void reconnectMQTT() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
   while (!client.connected()) {
-    String clientId = "ESP32-Raw-";
+    Serial.print("Tentando conectar MQTT...");
+    String clientId = "ESP32-Voltz-";
     clientId += String(random(0xffff), HEX);
+    
     if (client.connect(clientId.c_str())) {
-      Serial.println("MQTT Conectado");
+      Serial.println("Conectado!");
     } else {
-      delay(2000);
+      Serial.print("falha, rc=");
+      Serial.print(client.state());
+      Serial.println(" tentando novamente em 2s");
+      vTaskDelay(pdMS_TO_TICKS(2000));
     }
   }
 }
 
 // ------------------------------------------------------------------
-// --- TAREFAS ---
+// --- TAREFAS (FREERTOS) ---
 // ------------------------------------------------------------------
 
-// 1. Task de Leitura/Simulação CAN
+// 1. Task Core 0: Leitura de Alta Velocidade e Timestamper
 void canSourceTask(void* pvParameters) {
-  const unsigned long SIM_INTERVAL_MS = 100;  // Intervalo da simulação
-
-  while (true) {
+  for (;;) {
     CanMessage frame;
+    bool hasData = false;
 
     if (TESTMODE) {
-      // --- MODO SIMULAÇÃO ---
+      // Simulação de tráfego para teste
+       // --- MODO SIMULAÇÃO ---
       frame.id = (random(1, 100) < 70)
                    ? (random(0, 2) == 0 ? BASE_BATTERY_ID : BASE_CONTROLLER_ID)
                    : random(0x000, 0x7FF + 1);
@@ -103,88 +113,100 @@ void canSourceTask(void* pvParameters) {
           frame.data[i] = random(0, 255);
         }
       }
+      
+      // Timestamp da simulação
+      struct timeval tv_now;
+      gettimeofday(&tv_now, NULL);
+      frame.timestamp = (int64_t)tv_now.tv_sec * 1000LL + (tv_now.tv_usec / 1000LL);
+      
+      hasData = true;
+      vTaskDelay(pdMS_TO_TICKS(20)); 
     } else {
-      // --- MODO REAL ---
-      twai_message_t rx;
-      if (ESP32Can.readFrame(&rx)) {
+      CanFrame rx;
+      // readFrame(rx, 10) espera até 10ms por um frame no buffer do driver
+      if (ESP32Can.readFrame(rx, 10)) {
+        digitalWrite(ledCAN, !digitalRead(ledCAN)); 
+        
+        // CAPTURA DO TIMESTAMP NO MOMENTO DA CHEGADA
+        struct timeval tv_now;
+        gettimeofday(&tv_now, NULL);
+        frame.timestamp = (int64_t)tv_now.tv_sec * 1000LL + (tv_now.tv_usec / 1000LL);
+
         frame.id = rx.identifier;
         frame.length = rx.data_length_code;
-        frame.isExtended = (rx.flags & TWAI_MSG_FLAG_EXTD) != 0;
+        frame.isExtended = rx.extd;
         memcpy(frame.data, rx.data, rx.data_length_code);
-      } else {
-        vTaskDelay(1 / portTICK_PERIOD_MS);  // Aguarda se não houver dado
-        continue;
+        hasData = true;
       }
     }
 
-    // Envia frame bruto para a fila (timeout de 100ms)
-    if (xQueueSend(canRawQueue, &frame, pdMS_TO_TICKS(100)) != pdTRUE) {
-      Serial.println("Fila cheia! Frame descartado.");
+    if (hasData) {
+      // Envia para a fila para processamento no Core 1
+      if (xQueueSend(canRawQueue, &frame, 0) != pdTRUE) {
+        if (DEBUGMODE) Serial.println("Fila de processamento cheia!");
+      }
     }
-
-    if (TESTMODE) vTaskDelay(SIM_INTERVAL_MS / portTICK_PERIOD_MS);
+    vTaskDelay(0); // Cede tempo para o IDLE do Core 0
   }
 }
 
-// 2. Task de Publicação MQTT (Consome dados brutos)
+// 2. Task Core 1: Gestão Wi-Fi e Publicação MQTT em Lote
 void mqttPublisherTask(void* pvParameters) {
   CanMessage rawFrame;
   char jsonBuffer[256];
+  TickType_t xLastWakeTime = xTaskGetTickCount();
 
-  // Configura servidor MQTT
   client.setServer(mqtt_server, mqtt_port);
 
-  while (true) {
-    // Garante conexão MQTT
-    if (!client.connected()) {
+  for (;;) {
+    // Manutenção da Conexão WiFi
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin(ssid, password);
+      int timeout = 0;
+      while (WiFi.status() != WL_CONNECTED && timeout < 10) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        timeout++;
+      }
+    }
+
+    // Manutenção da Conexão MQTT
+    if (WiFi.status() == WL_CONNECTED && !client.connected()) {
       reconnectMQTT();
     }
     client.loop();
 
-    // Recebe frame bruto da fila (bloqueia até chegar dado)
-    if (xQueueReceive(canRawQueue, &rawFrame, portMAX_DELAY) == pdTRUE) {
+    // PROCESSAMENTO EM LOTE: Esvazia toda a fila acumulada
+    while (xQueueReceive(canRawQueue, &rawFrame, 0) == pdTRUE) {
+      digitalWrite(ledMQTT, HIGH);
 
-      // Monta JSON com dados brutos (Hexadecimal para facilitar leitura de CAN)
       StaticJsonDocument<256> doc;
       doc["canId"] = rawFrame.id;
       doc["ide"] = rawFrame.isExtended;
 
-      // Converte array de bytes para string Hex "AA BB CC..."
-      String dataHex = "";
+      // Conversão eficiente de dados para Hex String
+      char dataHex[25]; 
+      char* ptr = dataHex;
       for (int i = 0; i < rawFrame.length; i++) {
-        if (i > 0) dataHex += " ";
-        char hex[3];
-        sprintf(hex, "%02X", rawFrame.data[i]);
-        dataHex += hex;
+        ptr += sprintf(ptr, i == 0 ? "%02X" : " %02X", rawFrame.data[i]);
       }
       doc["data"] = dataHex;
       doc["dlc"] = rawFrame.length;
+      
+      // ENVIO DO TIMESTAMP ORIGINAL (Capturado na Task CAN)
+      doc["ts"] = rawFrame.timestamp; 
 
-      struct tm timeinfo;
-      if (!getLocalTime(&timeinfo)) {
-        Serial.println("Falha ao obter a hora");
-        doc["ts"] = millis();
-      } else {
-        // Mostra a data formatada no Serial
-        //Serial.println(&timeinfo, "%d/%m/%Y %H:%M:%S");
-
-        // Para enviar ao JS, você pegaria o timestamp:
-        time_t agora;
-        time(&agora);
-        //Serial.printf("Timestamp para o JS: %ld\n", agora);
-
-        doc["ts"] = agora;
-      }
-      // Serializa para string
       serializeJson(doc, jsonBuffer, sizeof(jsonBuffer));
 
-      // Publica no tópico
-      if (client.publish(MQTT_TOPIC, jsonBuffer)) {
-        // Sucesso (opcional: piscar LED)
-      } else {
-        Serial.println("Falha no publish MQTT");
+      if (client.connected()) {
+        client.publish(MQTT_TOPIC, jsonBuffer);
       }
+      
+      digitalWrite(ledMQTT, LOW);
+      vTaskDelay(0); // Evita bloqueio da stack Wi-Fi
     }
+
+    // Aguarda até o próximo ciclo de transmissão
+    vTaskDelayUntil(&xLastWakeTime, TRANSMIT_INTERVAL);
   }
 }
 
@@ -194,38 +216,35 @@ void mqttPublisherTask(void* pvParameters) {
 void setup() {
   Serial.begin(115200);
 
-  // Inicializa Fila
-  canRawQueue = xQueueCreate(BufferSize, sizeof(CanMessage));  // Buffer para 10 frames
+  pinMode(ledCAN, OUTPUT);
+  pinMode(ledMQTT, OUTPUT);
 
-  // Inicializa CAN
+  // Criação da fila de mensagens
+  canRawQueue = xQueueCreate(BufferSize, sizeof(CanMessage));
+
+  // Início do WiFi
+  WiFi.begin(ssid, password);
+  
+  // Configuração do NTP para sincronizar o timestamp real
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  // Inicialização do Driver CAN
   ESP32Can.setPins(CAN_TX_PIN, CAN_RX_PIN);
   if (!TESTMODE) {
-    if (ESP32Can.begin(TWAI_SPEED_250KBPS)) {
-      Serial.println("CAN Real Iniciado");
-    } else {
-      Serial.println("Erro ao iniciar CAN");
+    if (!ESP32Can.begin(CAN_SPEED)) {
+      Serial.println("Critico: Falha ao iniciar barramento CAN");
       while (1) delay(1000);
     }
-  } else {
-    Serial.println("Modo Simulação Ativo");
   }
 
-  // Inicializa WiFi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi Conectado");
-  // Inicia a sincronização com o servidor NTP para horario
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  // Cria Tasks
-  // Prioridade 1 para ambas, rodando em núcleos diferentes se desejar (affinity NULL)
-  xTaskCreate(canSourceTask, "CAN_Source", 4096, NULL, 1, NULL);
-  xTaskCreate(mqttPublisherTask, "MQTT_Pub", 8192, NULL, 1, NULL);
+  // Task de leitura no Core 0 (Prioridade 3 - Máxima para dados)
+  xTaskCreatePinnedToCore(canSourceTask, "CAN_Source", 4096, NULL, 3, NULL, 0); 
+  
+  // Task de Wi-Fi/MQTT no Core 1 (Prioridade 1 - Menor)
+  xTaskCreatePinnedToCore(mqttPublisherTask, "MQTT_Pub", 8192, NULL, 1, NULL, 1); 
 }
 
 void loop() {
-  // Nada aqui, FreeRTOS gerencia tudo
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  // Deleta o loop padrão para economizar recursos, o sistema roda nas Tasks
+  vTaskDelete(NULL); 
 }

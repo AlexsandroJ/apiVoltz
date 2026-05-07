@@ -87,6 +87,7 @@ void canSourceTask(void* pvParameters) {
     bool hasData = false;
 
     if (TESTMODE) {
+      // --- MODO SIMULAÇÃO ---
       frame.id = (random(1, 100) < 70)
                    ? (random(0, 2) == 0 ? BASE_BATTERY_ID : BASE_CONTROLLER_ID)
                    : random(0x000, 0x7FF + 1);
@@ -94,8 +95,18 @@ void canSourceTask(void* pvParameters) {
       frame.isExtended = false;
       for (int i = 0; i < 8; i++) {
         if (i == 5) {
-          int choice = random(0, 3);
-          frame.data[i] = (choice == 0) ? 0x45 : (choice == 1) ? 0x4D : 0x55;
+          int choice = random(0, 3);  
+          switch (choice) {
+            case 0:
+              frame.data[i] = 0x45;
+              break;
+            case 1:
+              frame.data[i] = 0x4D;
+              break;
+            case 2:
+              frame.data[i] = 0x55;
+              break;
+          }
         } else {
           frame.data[i] = random(0, 255);
         }
