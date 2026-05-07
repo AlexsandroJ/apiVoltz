@@ -261,7 +261,6 @@ exports.exportVehicleDataAsCsv = async (req, res) => {
   // Define cabeçalho do CSV
   const headers = [
     'timestamp',
-    'ms',
     'deviceId',
     'battery.soc',
     'battery.soh',
