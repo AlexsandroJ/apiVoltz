@@ -60,17 +60,9 @@ Ideal para: testes de campo, desenvolvimento de firmware, manutenção preditiva
 ---
 
 ## 📁 Codigo FreeRTOS do Projeto
-```
-apiVoltz/
-    ├── sketch_def/
-    │   └── sketch_def.ino          # FreeRTOS
-```
 
-[⚙️ sketch_def.ino (FreeRTOS)](sketch_def/sketch_def.ino)
-
-# 📂 Estrutura com Links
-- 📁 [sketch_def/](sketch_def/)
-  - 📄 [sketch_def.ino (FreeRTOS)](sketch_def/sketch_def.ino)
+- 📁 [src/sketch_def](src/sketch_def)
+  - 📄 [sketch_def.ino (Codigo FreeRTOS do Projeto)](src/sketch_def/sketch_def.ino)
 
 
 # Guia de Instalação e Conexão MQTT — apiVoltz
