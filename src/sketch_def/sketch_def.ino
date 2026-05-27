@@ -24,9 +24,9 @@
 
 const char *ssid = "Salvacao_2_conto";
 const char *password = "mimda2conto";
-const char *mqtt_server = "192.168.1.185";
+const char *mqtt_server = "192.168.1.47";
 const char* MQTT_TOPIC = "moto/telemetria";
-const int mqtt_port = 31125;
+const int mqtt_port = 1883;
 
 const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
 
@@ -110,7 +110,7 @@ void canSourceTask(void* pvParameters) {
               break;
           }
         } else {
-          frame.data[i] = random(0, 255);
+          frame.data[i] = random(5, 8);
         }
       }
       
