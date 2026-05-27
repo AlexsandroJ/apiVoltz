@@ -1,6 +1,6 @@
 # 🔋 MoDCS - Sistema de Telemetria para Moto Elétrica
 
-![Dashboard Preview](/public/img/dashboard_3.png)
+![Dashboard Preview](/public/img/dashe.png)
 
 > **API + Dashboard em tempo real para monitoramento da moto elétrica MoDCS**  
 > Solução completa para leitura, processamento e visualização de dados telemétricos via rede CAN e MQTT.
