@@ -59,12 +59,20 @@ Ideal para: testes de campo, desenvolvimento de firmware, manutenção preditiva
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Codigo FreeRTOS do Projeto
 ```
 apiVoltz/
     ├── sketch_def/
     │   └── sketch_def.ino          # FreeRTOS
 ```
+
+[⚙️ sketch_def.ino (FreeRTOS)](sketch_def/sketch_def.ino)
+
+# 📂 Estrutura com Links
+- 📁 [sketch_def/](sketch_def/)
+  - 📄 [sketch_def.ino (FreeRTOS)](sketch_def/sketch_def.ino)
+
+
 # Guia de Instalação e Conexão MQTT — apiVoltz
 
 > Este guia explica passo a passo como instalar o **Mosquitto MQTT Broker**, configurar o arquivo `.env` da API e estabelecer a conexão entre a API Node.js e o broker MQTT para telemetria da moto elétrica Voltz.
