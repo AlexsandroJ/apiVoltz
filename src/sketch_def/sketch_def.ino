@@ -22,8 +22,8 @@
 #define DEBUGMODE false
 #define BufferSize 250  // Buffer aumentado para evitar perda em latências de rede
 
-const char *ssid = "Salvacao_2_conto";
-const char *password = "mimda2conto";
+const char *ssid = "voltz";
+const char *password = "12345678";
 const char *mqtt_server = "192.168.1.47";
 const char* MQTT_TOPIC = "moto/telemetria";
 const int mqtt_port = 1883;
