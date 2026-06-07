@@ -66,7 +66,7 @@ async function initialize() {
   gpsElements.btn?.addEventListener('click', gps.toggleTracking);
   
   // 🔹 7. Conecta WebSocket
-  connectWebSocket();
+  //connectWebSocket();
   
   // 🔹 8. Carrega dados iniciais
   await refreshAllData();
@@ -86,7 +86,7 @@ async function refreshAllData() {
 
     // 🔹 Busca dados decodificados
     const records = await fetchDecodedData();
-    
+
     // 🔹 Se houver dados, atualiza a UI com o registro mais recente
     if (records?.length > 0) {
       const latest = records[records.length - 1];

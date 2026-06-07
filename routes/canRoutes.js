@@ -5,7 +5,7 @@ const router = express.Router();
 const {
   createVehicleData,
   getVehicleData,
-  addCanMessage,
+  addCanMessages,
   getRecentCanData,
   exportAllCanDataAsCsv,
   exportVehicleDataAsCsv,
@@ -437,7 +437,7 @@ router.get('/device', getVehicleData);
  *       404:
  *         description: "deviceId não encontrado"
  */
-router.post('/can', addCanMessage);
+router.post('/can', addCanMessages);
 
 /**
  * @swagger

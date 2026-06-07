@@ -7,7 +7,8 @@
     "start": "nodemon server.js",
     "dev": "nodemon server.js",
     "test": "jest",
-    "test:mqtt": "jest tests/integration/mqttTelemetry.test.js"
+    "test:mqtt": "jest tests/integration/mqttTelemetry.test.js",
+    "test:controllers": "jest tests/controllers"
   },
   "author": "alexsandroj",
   "license": "ISC",

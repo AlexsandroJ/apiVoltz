@@ -86,7 +86,7 @@ function onGpsSuccess(position) {
     altAcc: altitudeAccuracy !== null ? `±${Math.round(altitudeAccuracy)}m` : '—',
     heading: heading !== null ? `${Math.round(heading)}°` : '—',
     // Converte m/s para km/h para leitura humana
-    speed: speed !== null ? `${(speed * 3.6).toFixed(1)} km/h` : '0 km/h',
+    speed: speed !== null ? `${speed.toFixed(1)} m/s` : '0 m/s',
     time: new Date(timestamp).toLocaleTimeString()
   };
 

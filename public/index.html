@@ -133,15 +133,17 @@
 
     <div class="can-section">
       <h2 class="can-header">
-        🔑​ Dados decodificados
+        🔑 Dados decodificados
         <button id="download-device-data" class="btn-download">
-          <img src="./img/csv.png" alt="" style="width: 50px; height: 50px; vertical-align: middle;">
+          <img src="./img/csv.png" alt="Baixar CSV" style="width: 50px; height: 50px; vertical-align: middle;">
         </button>
       </h2>
+
       <div class="can-table-container">
         <table>
           <thead>
             <tr>
+              <!-- === DADOS CAN/VEÍCULO (originais) === -->
               <th>Timestamp</th>
               <th>Modo</th>
               <th>RPM</th>
@@ -151,58 +153,72 @@
               <th>Temp. Bateria (°C)</th>
               <th>Tensão (V)</th>
               <th>Corrente (A)</th>
+
+              <!-- === DADOS DE LOCALIZAÇÃO (GPS) === -->
               <th>Localização</th>
               <th>Accuracy (m)</th>
-              <th>Velocidade (km/h)</th>
+              <th>Velocidade (m/s)</th>
               <th>Altitude (m)</th>
               <th>Altitude Accuracy (m)</th>
               <th>Direção (°)</th>
+
+              <!-- === NOVOS DADOS MPU-6050 (IMU) === -->
+              <!-- Acelerômetro: mede aceleração linear em cada eixo (unidade: g = gravidade) -->
+              <th title="Aceleração no eixo X (gravidade)">Acc X (g)</th>
+              <th title="Aceleração no eixo Y (gravidade)">Acc Y (g)</th>
+              <th title="Aceleração no eixo Z (gravidade)">Acc Z (g)</th>
+
+              <!-- Giroscópio: mede velocidade angular em cada eixo (unidade: °/s) -->
+              <th title="Velocidade angular no eixo X (graus/segundo)">Giro X (°/s)</th>
+              <th title="Velocidade angular no eixo Y (graus/segundo)">Giro Y (°/s)</th>
+              <th title="Velocidade angular no eixo Z (graus/segundo)">Giro Z (°/s)</th>
             </tr>
           </thead>
+
           <!-- ID fixo para o tbody: JS vai injetar as linhas aqui -->
           <tbody id="vehicle-data-body">
             <!-- Mensagem de "vazio" exibida por padrão -->
             <tr id="empty-row">
-              <td colspan="10" class="empty">Nenhum dado recebido.</td>
+              <td colspan="21" class="empty">Nenhum dado recebido.</td>
             </tr>
           </tbody>
         </table>
       </div>
-
-
-
-      <!-- Área do Mapa -->
-      <div class="map-section">
-        <!-- GPS Simplificado -->
-        <div class="container-gps">
-          <button id="gps-btn" class="btn">🔎 Buscar GPS 📍</button>
-          <span id="gps-label">Aguardando...</span>
-        </div>
-        
-        <div id="map"></div>
-      </div>
-
-      <div id="gps-status" style="margin-top: 8px; font-size: 0.9em; color: #666;"></div>
-
-      <footer>
-        &copy; 2026 Sistema de Monitoramento MoDCS | Dados da rede CAN via MQTT | GPS via Geolocation API
-      </footer>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Script principal -->
-    <!-- Scripts modularizados (tipo module para ES6 imports) -->
-    <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/dom-elements.js"></script>
-    <script type="module" src="js/utils.js"></script>
-    <script type="module" src="js/map.js"></script>
-    <script type="module" src="js/gps.js"></script>
-    <script type="module" src="js/api.js"></script>
-    <script type="module" src="js/websocket.js"></script>
-    <script type="module" src="js/can-table.js"></script>
-    <script type="module" src="js/ui.js"></script>
-    <script type="module" src="js/main.js"></script>
+
+    <!-- Área do Mapa -->
+    <div class="map-section">
+      <!-- GPS Simplificado -->
+      <div class="container-gps">
+        <button id="gps-btn" class="btn">🔎 Buscar GPS 📍</button>
+        <span id="gps-label">Aguardando...</span>
+      </div>
+
+      <div id="map"></div>
+    </div>
+
+    <div id="gps-status" style="margin-top: 8px; font-size: 0.9em; color: #666;"></div>
+
+    <footer>
+      &copy; 2026 Sistema de Monitoramento MoDCS | Dados da rede CAN via MQTT | GPS via Geolocation API
+    </footer>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Script principal -->
+  <!-- Scripts modularizados (tipo module para ES6 imports) -->
+  <script type="module" src="js/config.js"></script>
+  <script type="module" src="js/dom-elements.js"></script>
+  <script type="module" src="js/utils.js"></script>
+  <script type="module" src="js/map.js"></script>
+  <script type="module" src="js/gps.js"></script>
+  <script type="module" src="js/api.js"></script>
+  <script type="module" src="js/websocket.js"></script>
+  <script type="module" src="js/can-table.js"></script>
+  <script type="module" src="js/ui.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 
 </html>

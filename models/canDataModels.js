@@ -66,8 +66,34 @@ const vehicleDataSchema = new mongoose.Schema({
   },
   heading: {
     type: Number,
-  }
+  },
 
+  accelerometer: {
+    ax_g: {
+      type: Number,  // Aceleração no eixo X em unidades de g
+    },
+    ay_g: {
+      type: Number,  // Aceleração no eixo Y em unidades de g
+    },
+    az_g: {
+      type: Number,  // Aceleração no eixo Z em unidades de g
+    }
+  },
+
+  // --- Giroscópio: mede velocidade angular em cada eixo ---
+  // Unidade: graus por segundo (°/s ou dps)
+  // Útil para detectar inclinação, curvas e vibrações
+  gyroscope: {
+    gx_dps: {
+      type: Number,  // Velocidade angular no eixo X (rolagem)
+    },
+    gy_dps: {
+      type: Number,  // Velocidade angular no eixo Y (arfagem)
+    },
+    gz_dps: {
+      type: Number,  // Velocidade angular no eixo Z (guinada)
+    }
+  },
 
 }, {
   timestamps: true, // createdAt, updatedAt
