@@ -54,6 +54,7 @@ connectDB()
   .then(() => {
     server.listen(PORT, async () => {
       console.log(`🟢 Servidor rodando na porta ${PORT}`);
+      console.log(`🟢 ${process.env.API_URL}`);
       //console.log(`WebSocket disponível em ws://localhost:${PORT}`);
     });
   })
