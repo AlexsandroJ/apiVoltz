@@ -1,5 +1,5 @@
 // backend/services/canService.js
-const CanData = require('../models/CanDataModels'); // Seu model do MongoDB
+const CanData = require('../models/canDataModels'); // Seu model do MongoDB
 
 /**
  * Salva mensagens CAN diretamente no banco (SEM HTTP)
