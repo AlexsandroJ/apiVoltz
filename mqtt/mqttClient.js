@@ -1,7 +1,7 @@
 // mqtt/mqttClient.js
 const mqtt = require('mqtt');
 const { addCanMessage, getDecodedCanData } = require('../utils/api');
-const { saveCanMessage } = require('../util/canService'); // ✅ Importa direto
+const { saveCanMessage } = require('../utils/canService'); // ✅ Importa direto
 
 const MQTT_BROKER = process.env.MQTT_BROKER;
 const MQTT_TOPIC = process.env.MQTT_TOPIC;
