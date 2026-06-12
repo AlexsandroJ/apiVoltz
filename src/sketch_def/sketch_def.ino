@@ -30,11 +30,11 @@
 #define DEBUGMODE false
 #define BufferSize 250  // Buffer aumentado para evitar perda em latências de rede
 
-const char *ssid = "Voltz";
-const char *password = "12345678";
-const char *serverAddress = "192.168.43.168";
+const char *ssid = "Salvacao_2_conto";
+const char *password = "mimda2conto";
+const char *serverAddress = "192.168.1.47";
 const char* MQTT_TOPIC = "moto/telemetria";
-const int mqtt_port = 1883;
+const int mqtt_port = 31883;
 
 const TwaiSpeed CAN_SPEED = TWAI_SPEED_250KBPS;
 

@@ -1,6 +1,7 @@
 // mqtt/mqttClient.js
 const mqtt = require('mqtt');
 const { addCanMessage, getDecodedCanData } = require('../utils/api');
+const { saveCanMessage } = require('../services/canService'); // ✅ Importa direto
 
 const MQTT_BROKER = process.env.MQTT_BROKER;
 const MQTT_TOPIC = process.env.MQTT_TOPIC;
@@ -32,7 +33,7 @@ async function connectMQTT() {
         const data = JSON.parse(payload);
         //data.deviceId = data.deviceId || 'unknown-device'; // Garantir que deviceId exista
         
-        await addCanMessage(data); // Enviar para API
+        await saveCanMessage(data); // Salvar diretamente no banco
 
         
 
